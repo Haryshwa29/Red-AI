@@ -14,6 +14,19 @@ detector ladder + adaptive planner. Zero third-party dependencies; runs on a
 bundled Python with no network and no API key. Targets are synthetic
 simulations only in this release.
 
+## Architecture at a glance
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="RED-AI architecture — animated pipeline" width="100%">
+</p>
+
+Data flows **Objective → Knowledge → Capability Router → Gate → Execution →
+Evidence → Report**, with three hard-walled engines (LLM injection · recon ·
+exploit), an optional reorder-only strategist, and a human-gated learning
+back-flow. A detailed, native-rendering **Mermaid breakdown** is in
+[`docs/ARCHITECTURE_DIAGRAM.md`](docs/ARCHITECTURE_DIAGRAM.md); the full prose
+design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 ## The one principle
 
 > The AI decides **how** to test. Deterministic code decides **what it is
