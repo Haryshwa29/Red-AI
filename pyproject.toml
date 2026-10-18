@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "red-ai"
+version = "1.0.0"
+description = "RED-AI — offline, evidence-first AI security testing (authorized use only)"
+requires-python = ">=3.10"
+dependencies = []          # zero third-party deps: runs on a bundled Python, offline
+
+[project.scripts]
+red-ai = "red_ai.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["red_ai*"]

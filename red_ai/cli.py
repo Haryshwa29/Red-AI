@@ -1,0 +1,314 @@
+"""RED-AI operator CLI. Offline; simulation targets only in this release.
+
+Commands:
+  init-demo            create the local operator key and signed demo scopes
+  demo [--open]        run naive/guarded/hardened simulations + reports
+  run --scope F --level L   run one signed scope against a simulation level
+  report RUN_DIR       regenerate reports from a run's evidence
+  verify RUN_DIR       verify the evidence hash chain
+  doctor               validate config/skills/signing WITHOUT running a scan
+  stop | resume        operator kill switch (persists until resume)
+"""
+from __future__ import annotations
+
+import argparse
+from datetime import timedelta
+import json
+import os
+from pathlib import Path
+import secrets
+import sys
+
+from red_ai.contracts.domain import AssetCategory
+from red_ai.contracts.scope import Scope, now, sign_scope, verify_scope
+from red_ai.detection.canary import make_canary
+from red_ai.onboarding.profile import build_profile
+from red_ai.onboarding.objectives import ProfileObjectiveGenerator
+from red_ai.intelligent import skills
+from red_ai.intelligent.providers import MockProvider, make_provider, ProviderError
+from red_ai.targets.simulation import SimulationAdapter, _LEVELS
+from red_ai.control.controller import Controller, new_run_path
+from red_ai.control.memory import CaseStore
+from red_ai.control.identity import (
+    Keyring, DEFAULT_OPERATOR, AccessDenied, authorize_invocation, authorize_read,
+)
+from red_ai.learning import propose_upgrades, write_upgrade_review
+from red_ai.engine import ControlPlane, Engagement
+from red_ai.reporting.report import write_report
+
+LEVELS = tuple(_LEVELS)
+
+
+def key_at(root: Path, create: bool = False) -> bytes:
+    path = root / "operator.key"
+    if not path.exists() and create:
+        root.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as h:
+            h.write(secrets.token_bytes(32))
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    if not path.exists():
+        raise ValueError("No operator key. Run: red_ai init-demo")
+    return path.read_bytes()
+
+
+def demo_scope(level: str) -> Scope:
+    return Scope(
+        scope_id=f"sim-{level}", owner="Local operator", authorised_by="Local operator",
+        target=f"sim-{level}", environment="simulation",
+        valid_from=(now() - timedelta(minutes=1)).isoformat(),
+        valid_until=(now() + timedelta(hours=24)).isoformat(),
+        max_queries=300, max_cost_units=400, max_seconds=300, replays=3, confirmations=1,
+        operator_id=DEFAULT_OPERATOR, readers=(DEFAULT_OPERATOR,),
+    )
+
+
+def init_demo(root: Path) -> None:
+    key = key_at(root, create=True)
+    for level in LEVELS:
+        (root / f"sim-{level}.scope.json").write_text(
+            json.dumps(sign_scope(demo_scope(level), key), indent=2), encoding="utf-8")
+
+
+def demo_profile():
+    cny = make_canary(AssetCategory.SYSTEM_PROMPT, "system_prompt")
+    profile, _ = build_profile(
+        name="Acme Bank SupportBot", industry="retail bank",
+        bot_purpose="customer support for accounts, cards and payments",
+        authorised_by="Local operator", environment="simulation", planted_canaries=[cny])
+    return profile
+
+
+def execute(scope: Scope, root: Path, level: str, profile=None, use_memory: bool = False, adapter=None):
+    profile = profile or demo_profile()
+    objectives = ProfileObjectiveGenerator().generate(profile)
+    skill = skills.get("prompt_injection")
+    memory = []
+    if use_memory:
+        store = CaseStore(root / "memory.sqlite")
+        try:
+            memory = store.retrieve(profile, scope.environment)
+        finally:
+            store.close()
+        print(f"    memory: {len(memory)} reviewed case(s) influencing order")
+    out = new_run_path(root)
+    adapter = adapter or SimulationAdapter(level, profile)
+    provider = make_provider()  # None unless RED_AI_MODEL_URL is set -> deterministic planner
+    if provider is not None:
+        print(f"    brain: {provider.get_model_info()['name']} (model-driven technique selection)")
+    summary = Controller(scope, adapter, out, skill, cancel_file=root / "STOP", provider=provider).run(profile, objectives, memory=memory)
+    report = write_report(out)
+    print(f"[{level}] outcomes={summary['counts']} findings={len(summary['findings'])} "
+          f"stop={summary['halt_reason']} queries={summary['queries']}")
+    print(f"    report: {report.resolve()}")
+    return out
+
+
+def execute_engine(scope: Scope, root: Path, level: str, profile=None):
+    """Run one engagement through the unified control plane (knowledge + routing
+    + hypotheses + delegated execution + learning). Old `run` path is untouched."""
+    profile = profile or demo_profile()
+    objectives = ProfileObjectiveGenerator().generate(profile)
+    provider = make_provider()
+    eng = Engagement(kind="llm", scope=scope, profile=profile,
+                     adapter=SimulationAdapter(level, profile),
+                     objectives=tuple(objectives), provider=provider,
+                     cancel_file=root / "STOP")
+    cp = ControlPlane(root, provider=provider, cancel_file=root / "STOP",
+                      case_store_path=root / "memory.sqlite")
+    out = cp.run(eng)
+    sb = out["capability_summary"]
+    sb_counts = sb.get("counts", {})
+    scoreboard = {"supported": sum(1 for h in out["hypotheses"] if h["status"] == "supported"),
+                  "formed": len(out["hypotheses"])}
+    print(f"[control-plane:{level}] capability={out['capability']} "
+          f"routing={out['routing']['ordering_source']}")
+    print(f"    hypotheses supported={scoreboard['supported']}/{scoreboard['formed']}  "
+          f"findings={len(sb['findings'])}  outcomes={sb_counts}  "
+          f"quarantined_evidence={out['evidence_quarantined']}")
+    print(f"    knowledge_hash={out['knowledge_hash'][:16]}  "
+          f"upstream_candidates={out['learning'].get('upstream_candidates')}")
+    if out.get("report"):
+        print(f"    report: {Path(out['report']).resolve()}")
+    print(f"    manifest: {Path(out['manifest']).resolve()}")
+    return out
+
+
+def doctor(root: Path) -> None:
+    print("RED-AI doctor — configuration and readiness (no scan executed)")
+    ok = True
+    try:
+        key = key_at(root, create=True)
+        s = demo_scope("naive")
+        assert verify_scope(sign_scope(s, key), key) == s
+        print("  [ok] operator key present and scope sign/verify round-trips")
+    except Exception as e:
+        ok = False; print(f"  [FAIL] scope signing: {e}")
+    try:
+        names = [s.id for s in skills.all_skills()]
+        print(f"  [ok] skills registered: {names}")
+    except Exception as e:
+        ok = False; print(f"  [FAIL] skill registry: {e}")
+    try:
+        from red_ai.engine import default_capabilities, CapabilityRouter
+        caps = default_capabilities()
+        CapabilityRouter(caps)
+        print(f"  [ok] control plane: {len(caps)} routable capability(ies): {[c.id for c in caps]}")
+    except Exception as e:
+        ok = False; print(f"  [FAIL] control plane: {e}")
+    try:
+        info = MockProvider().get_model_info()
+        print(f"  [ok] model provider seam: {info['name']} (offline)")
+    except Exception as e:
+        ok = False; print(f"  [FAIL] provider: {e}")
+    provider = make_provider()
+    if provider is None:
+        print("  [ok] brain: none configured -> deterministic planner (set RED_AI_MODEL_URL to attach a local model)")
+    else:
+        healthy, detail = provider.health()
+        tag = "ok" if healthy else "warn"
+        print(f"  [{tag}] brain {provider.get_model_info()['name']}: {detail}")
+    try:
+        print(f"  [ok] operators registered: {Keyring(root).ids() or '(none)'}")
+    except Exception as e:
+        print(f"  [warn] operators: {e}")
+    print(f"  [ok] simulation levels available: {list(LEVELS)}")
+    print("READY" if ok else "NOT READY")
+    if not ok:
+        raise SystemExit(1)
+
+
+def _authorize_run_read(root: Path, run_dir: Path, operator_id: str) -> None:
+    """Need-to-know gate for a run's artifacts: read the run's own scope from its
+    evidence and refuse an operator who is not an authorized reader. A run whose
+    scope carries no reader restriction is legacy-open (stated limit)."""
+    from red_ai.control.evidence import read_verified
+    events = read_verified(Path(run_dir) / "events.jsonl")
+    scope_dict = events[-1]["payload"].get("scope") if events else None
+    if not isinstance(scope_dict, dict):
+        return
+    authorize_read(Scope.from_dict(scope_dict), operator_id, Keyring(root))
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(prog="red_ai", description="RED-AI — offline, evidence-first AI security testing")
+    p.add_argument("--data-dir", type=Path, default=Path("data"))
+    sub = p.add_subparsers(dest="command", required=True)
+    sub.add_parser("init-demo")
+    d = sub.add_parser("demo"); d.add_argument("--open", action="store_true")
+    r = sub.add_parser("run"); r.add_argument("--scope", type=Path, required=True); r.add_argument("--level", choices=LEVELS, default="naive"); r.add_argument("--memory", action="store_true"); r.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR)); r.add_argument("--target-url"); r.add_argument("--target-api", choices=["ollama", "openai"], default="ollama"); r.add_argument("--target-model"); r.add_argument("--target-system"); r.add_argument("--target-key")
+    rep = sub.add_parser("report"); rep.add_argument("run_dir", type=Path); rep.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
+    ver = sub.add_parser("verify"); ver.add_argument("run_dir", type=Path); ver.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
+    pr = sub.add_parser("promote"); pr.add_argument("run_dir", type=Path); pr.add_argument("--finding", required=True); pr.add_argument("--reviewer", required=True); pr.add_argument("--approve", action="store_true", required=True, help="Attest you reviewed the evidence")
+    rv = sub.add_parser("revoke"); rv.add_argument("case_id"); rv.add_argument("--reviewer", required=True)
+    ln = sub.add_parser("learn", help="propose generic V0 upgrades from local reviewed memory (human-gated)")
+    ln.add_argument("--memory", type=Path, default=None, help="reviewed-memory sqlite (default: <data>/memory.sqlite)")
+    ln.add_argument("--min", type=int, default=2, dest="min_targets", help="min distinct targets for a candidate")
+    ln.add_argument("--export", action="store_true", help="write upstream_candidates.json + UPGRADE_REVIEW.md")
+    ln.add_argument("--out", type=Path, default=None, help="output dir for --export (default: <data>/upgrades)")
+    eng = sub.add_parser("engine", help="run through the unified control plane (knowledge+routing+hypotheses+learning)")
+    eng.add_argument("--scope", type=Path, required=True)
+    eng.add_argument("--level", choices=LEVELS, default="naive")
+    eng.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
+    op = sub.add_parser("operator", help="manage operator identities (keys)")
+    op.add_argument("op_action", choices=["add", "list"]); op.add_argument("op_id", nargs="?")
+    sub.add_parser("doctor")
+    sub.add_parser("stop"); sub.add_parser("resume")
+    args = p.parse_args(argv)
+    root = args.data_dir.resolve(); root.mkdir(parents=True, exist_ok=True)
+    try:
+        if args.command == "init-demo":
+            init_demo(root); print(f"Signed demo scopes written to {root} (valid 24h).")
+        elif args.command == "demo":
+            init_demo(root); profile = demo_profile(); last = None
+            key = key_at(root)
+            for level in LEVELS:
+                scope = verify_scope(json.loads((root / f"sim-{level}.scope.json").read_text(encoding="utf-8")), key)
+                last = execute(scope, root, level, profile)
+            if args.open and last:
+                import webbrowser; webbrowser.open((last / "report.html").as_uri())
+        elif args.command == "run":
+            keyring = Keyring(root)
+            scope = verify_scope(json.loads(args.scope.read_text(encoding="utf-8")), keyring.key(args.operator))
+            authorize_invocation(scope, args.operator, keyring)
+            adapter = None
+            if args.target_url:
+                if not args.target_model:
+                    print("--target-url requires --target-model", file=sys.stderr); return 1
+                from red_ai.targets.http_target import HTTPTargetAdapter
+                adapter = HTTPTargetAdapter(base_url=args.target_url, model=args.target_model,
+                                            api=args.target_api, system=args.target_system,
+                                            api_key=args.target_key)
+                print(f"    target: {adapter.name} @ {args.target_url} (LIVE endpoint)")
+            execute(scope, root, args.level, use_memory=args.memory, adapter=adapter)
+        elif args.command == "report":
+            _authorize_run_read(root, args.run_dir, args.operator)
+            print("report:", write_report(args.run_dir).resolve())
+        elif args.command == "verify":
+            _authorize_run_read(root, args.run_dir, args.operator)
+            from red_ai.control.evidence import read_verified
+            ev = read_verified(args.run_dir / "events.jsonl")
+            print(f"Verified {len(ev)} ordered events. Final hash: {ev[-1]['hash']}")
+        elif args.command == "promote":
+            store = CaseStore(root / "memory.sqlite")
+            try:
+                case_id = store.promote((args.run_dir / "events.jsonl").resolve(), args.finding, args.reviewer)
+                print(f"Promoted reviewed case: {case_id}")
+            finally:
+                store.close()
+        elif args.command == "revoke":
+            store = CaseStore(root / "memory.sqlite")
+            try:
+                store.revoke(args.case_id, args.reviewer)
+                print("Case revoked; retained in audit history, excluded from retrieval.")
+            finally:
+                store.close()
+        elif args.command == "learn":
+            mem = args.memory or (root / "memory.sqlite")
+            if not mem.exists():
+                print(f"No reviewed memory at {mem}. Promote findings first (red_ai promote).")
+                return 0
+            store = CaseStore(mem)
+            try:
+                candidates = propose_upgrades(store, min_distinct_targets=args.min_targets)
+            finally:
+                store.close()
+            print(f"{len(candidates)} upstream candidate(s) proposed (>= {args.min_targets} distinct targets).")
+            for c in candidates:
+                print(f"  {c.candidate_id}  {c.generic.category}/{c.generic.technique}"
+                      f"  (obs={c.provenance.observations}, targets={c.provenance.distinct_targets})")
+            if args.export:
+                out_dir = args.out or (root / "upgrades")
+                paths = write_upgrade_review(candidates, out_dir)
+                print(f"    upstream (generic only): {paths['upstream_json'].resolve()}")
+                print(f"    review report (keep local): {paths['review_md'].resolve()}")
+        elif args.command == "engine":
+            keyring = Keyring(root)
+            scope = verify_scope(json.loads(args.scope.read_text(encoding="utf-8")), keyring.key(args.operator))
+            authorize_invocation(scope, args.operator, keyring)
+            execute_engine(scope, root, args.level)
+        elif args.command == "operator":
+            keyring = Keyring(root)
+            if args.op_action == "add":
+                if not args.op_id:
+                    print("operator add requires an id", file=sys.stderr); return 1
+                keyring.create(args.op_id)
+                print(f"Created operator '{args.op_id}' (key stored locally, chmod 600).")
+            else:
+                ids = keyring.ids()
+                print("Operators:", ", ".join(ids) if ids else "(none)")
+        elif args.command == "doctor":
+            doctor(root)
+        elif args.command == "stop":
+            (root / "STOP").touch(); print("Kill switch active; runs will halt and future runs are denied.")
+        elif args.command == "resume":
+            (root / "STOP").unlink(missing_ok=True); print("Kill switch cleared.")
+    except (ValueError, KeyError, TypeError, OSError, AccessDenied) as e:
+        print(f"RED-AI: {e}", file=sys.stderr); return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

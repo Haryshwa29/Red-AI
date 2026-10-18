@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# RED-AI runtime data (ALL generated): operator keys (SECRET), signed scopes,
+# run evidence/reports. Regenerate with `python -m red_ai init-demo`.
+data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
