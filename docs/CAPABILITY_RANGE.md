@@ -29,8 +29,9 @@ capture already handles — so a rung fails only when the engine can't *reach* i
 | L6 | local file inclusion on `?file=` | LFI / path traversal | ✅ cleared |
 | L7 | hidden DB row via SQL injection | SQL injection | ✅ cleared |
 | L8 | command injection on `?host=` | command injection / RCE | ✅ cleared |
+| L9 | flag on a page found only by directory brute force | content discovery / dirbusting | ✅ cleared |
 
-**Frontier today: L1–L8 — the ladder is fully cleared.** The next work is to
+**Frontier today: L1–L9 — the ladder is fully cleared.** The next work is to
 *raise the ceiling*: harder rungs (password spray with lockout awareness,
 form/token auth, blind/boolean SQLi, second-order injection, multi-step chains,
 `user.txt`→`root.txt` privilege escalation) and non-web services (SSH/FTP). See

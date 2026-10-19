@@ -265,8 +265,8 @@ def main(argv=None) -> int:
     en.add_argument("--attestation", default="Authorized lab/CTF engagement (operator-attested).",
                     help="authorization statement recorded in the evidence")
     en.add_argument("--allow-production", action="store_true", help="required to engage a production target")
-    en.add_argument("--max-steps", type=int, default=120)
-    en.add_argument("--max-seconds", type=int, default=600)
+    en.add_argument("--max-steps", type=int, default=400)
+    en.add_argument("--max-seconds", type=int, default=900)
     en.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
     en.add_argument("--quiet", action="store_true", help="suppress the live progress stream")
     web = sub.add_parser("web", help="launch the local web console (watch an engagement live)")

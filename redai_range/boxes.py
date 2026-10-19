@@ -183,6 +183,19 @@ def _l8(path, query, headers):
     return 404, {}, b"Not Found"
 
 
+# --------------------------------------------------------------------------- #
+# L9 -- flag on a page reachable ONLY by directory brute force
+# (not linked, not in robots, not a flag-named file -- you must go looking)
+# --------------------------------------------------------------------------- #
+_L9_FLAG = "THM{l9_content_discovery_dirbrute}"
+def _l9(path, query, headers):
+    if path == "/internal":
+        return 200, {"Content-Type": "text/html"}, _html(f"Internal tools portal. {_L9_FLAG}")
+    if path == "/":
+        return 200, {"Content-Type": "text/html"}, _html("Corporate site. Nothing to see here.")
+    return 404, {}, b"Not Found"
+
+
 BOXES: tuple[Box, ...] = (
     Box("L1", "exposed-flag-file", 1, "exposed file at a guessable path",
         "path read (wordlist)", True, _L1_FLAG, _l1,
@@ -208,4 +221,7 @@ BOXES: tuple[Box, ...] = (
     Box("L8", "command-injection-rce", 8, "flag via command injection on ?host=",
         "command injection / RCE", True, _L8_FLAG, _l8,
         Solution("/ping", query="host=127.0.0.1;cat flag")),
+    Box("L9", "content-discovery-dirbrute", 9, "flag on a page found only by directory brute force",
+        "content discovery / dirbusting", True, _L9_FLAG, _l9,
+        Solution("/internal")),
 )

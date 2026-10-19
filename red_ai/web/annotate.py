@@ -8,6 +8,7 @@ back to a generic line rather than erroring."""
 from __future__ import annotations
 
 _MODULE_NAMES = {
+    "native.content_discovery": "content discovery",
     "native.web_flag_hunt": "content / flag hunt",
     "native.http_basic_auth": "default-credential check",
     "native.lfi_read": "LFI / path traversal",
@@ -96,10 +97,14 @@ def annotate(ev: dict) -> "dict | None":
             mod = _mod(p.get("module", ""))
             if p.get("flag_claimed"):
                 return _line("exploit", "good", f"{mod}: possible flag found — verifying…")
+            outcome = p.get("outcome")
+            if outcome == "no_effect":
+                return None  # "tried, nothing" is noise; show only progress
             proves = p.get("proves") or ""
             obs = (p.get("observations") or [""])[0]
             detail = proves or obs
-            return _line("exploit", "info", f"{mod}: {p.get('outcome')}"
+            level = "finding" if outcome == "advanced" else "info"
+            return _line("exploit", level, f"{mod}: {outcome}"
                          + (f" — {detail}" if detail else ""))
         if kind == "capture":
             if p.get("matched"):

@@ -24,7 +24,8 @@ from red_ai.exploit.scope import ExploitScope
 from red_ai.exploit.contracts import FlagDefinition
 from red_ai.exploit.module import ExploitModuleRegistry
 from red_ai.exploit.modules import (HTTPFlagReadModule, WebFlagHuntModule, HTTPBasicAuthModule,
-                                    LFIModule, SQLiModule, CommandInjectionModule)
+                                    LFIModule, SQLiModule, CommandInjectionModule,
+                                    ContentDiscoveryModule)
 from red_ai.exploit.controller import ExploitController
 from red_ai.exploit.bridge import surfaces_from_recon
 
@@ -35,8 +36,12 @@ DEFAULT_FLAG_PATTERN = r"(?:THM|FLAG|HTB|flag)\{[^}]{1,128}\}|\b[0-9a-f]{32}\b"
 
 
 def build_registry() -> ExploitModuleRegistry:
-    """The native, gated web exploit module set, native-first order."""
+    """The native, gated web exploit module set, native-first order.
+
+    Content discovery runs FIRST: the paths it finds are recorded as footholds
+    that the flag hunt and injection modules then inherit as candidate surface."""
     reg = ExploitModuleRegistry()
+    reg.register(ContentDiscoveryModule())
     reg.register(WebFlagHuntModule())
     reg.register(HTTPBasicAuthModule())
     reg.register(LFIModule())
@@ -53,7 +58,7 @@ class EngageError(ValueError):
 def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 flag_pattern=DEFAULT_FLAG_PATTERN, env="authorized_lab",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
-                allow_production=False, max_steps=120, max_seconds=600,
+                allow_production=False, max_steps=400, max_seconds=900,
                 operator=DEFAULT_OPERATOR, on_event=None, verbose=False) -> dict:
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
     root = Path(root)

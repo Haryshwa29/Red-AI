@@ -22,12 +22,14 @@ capture.** Given an authorized web surface it will:
    a 32-hex). The controller re-checks and re-runs the capture to report a
    measured reproduction rate.
 
-**This solves the common web-box shapes**: a flag exposed at a guessable or
-`robots`-disclosed path, in an exposed `.env`/`.git`, on a page reachable by
-following a homepage link, behind HTTP Basic auth that accepts **default
-credentials** (`admin:admin`), or reachable through a **single-step injection** on
-a discovered parameter — **LFI / path traversal, SQL injection, or command
-injection** (bounded, read-only payloads that prove the flaw and read the flag).
+**This solves the common web-box shapes**: a flag on a page found by **directory
+brute force** (content discovery), exposed at a guessable or `robots`-disclosed
+path, in an exposed `.env`/`.git`, on a page reachable by following a homepage
+link, behind HTTP Basic auth that accepts **default credentials** (`admin:admin`),
+or reachable through a **single-step injection** on a discovered parameter —
+**LFI / path traversal, SQL injection, or command injection** (bounded, read-only
+payloads that prove the flaw and read the flag). Content discovery runs first, so
+pages that aren't linked anywhere still get found and scanned.
 
 **It does NOT yet do** (each a planned, separately-gated module — not a silent
 gap): SSH/FTP brute force and password spray with lockout awareness, form-login /

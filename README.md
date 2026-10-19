@@ -42,7 +42,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (186 tests)
+python -m unittest discover -s tests -v # offline test suite (191 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 ```
 
@@ -138,11 +138,12 @@ gated, discovery-driven **web flag hunt** and captures the declared flag form
 (`THM{…}`/`flag{…}`/`HTB{…}`/32-hex) with a reproduced, zero-false-positive
 check — all driven by one `engage` command (see the runbook above).
 
-Web exploit coverage now clears the whole graded range (L1–L8): exposed-file and
-discovery-driven flag capture, HTML-link crawling, HTTP Basic **default
-credentials**, and the **injection family** — LFI / path traversal, SQL
-injection, and command injection — each a native, gated, bounded, read-only
-module behind the exploit interface.
+Web exploit coverage now clears the whole graded range (L1–L9): **content
+discovery** (directory brute force), exposed-file and discovery-driven flag
+capture, HTML-link crawling, HTTP Basic **default credentials**, and the
+**injection family** — LFI / path traversal, SQL injection, and command
+injection — each a native, gated, bounded, read-only module behind the exploit
+interface. Content discovery runs first and feeds what it finds to the rest.
 
 Not yet: password spray (with lockout awareness) and SSH/FTP brute force,
 form-login / token auth, blind / time-based injection, second-order injection,
