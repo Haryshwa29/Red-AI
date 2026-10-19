@@ -17,8 +17,11 @@ simulations only in this release.
 ## Architecture at a glance
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="RED-AI architecture — animated pipeline" width="100%">
+  <a href="https://raw.githubusercontent.com/Haryshwa29/Red-AI/main/docs/architecture.svg">
+    <img src="docs/architecture.svg" alt="RED-AI architecture — animated pipeline" width="100%">
+  </a>
 </p>
+<p align="center"><sub><b>▶ Click the diagram to open it full-size</b> (zoomable vector, animated) · or see the detailed <a href="docs/ARCHITECTURE_DIAGRAM.md">Mermaid breakdown</a></sub></p>
 
 Data flows **Objective → Knowledge → Capability Router → Gate → Execution →
 Evidence → Report**, with three hard-walled engines (LLM injection · recon ·

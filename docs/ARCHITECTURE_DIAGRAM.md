@@ -7,8 +7,11 @@ boundaries see [`MODEL_ROLES_AND_TRUST.md`](MODEL_ROLES_AND_TRUST.md).
 ## Animated pipeline
 
 <p align="center">
-  <img src="architecture.svg" alt="RED-AI animated architecture" width="100%">
+  <a href="https://raw.githubusercontent.com/Haryshwa29/Red-AI/main/docs/architecture.svg">
+    <img src="architecture.svg" alt="RED-AI animated architecture" width="100%">
+  </a>
 </p>
+<p align="center"><sub><b>▶ Click to open full-size</b> (zoomable, animated)</sub></p>
 
 > The SVG animates (data pulses flowing through the pipeline) via SMIL, which
 > survives GitHub's image proxy. If your viewer shows it static, open
