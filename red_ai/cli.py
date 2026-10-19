@@ -207,7 +207,8 @@ def cmd_engage(root: Path, args) -> int:
     from red_ai.exploit.scope import ExploitScope
     from red_ai.exploit.contracts import FlagDefinition
     from red_ai.exploit.module import ExploitModuleRegistry
-    from red_ai.exploit.modules import HTTPFlagReadModule, WebFlagHuntModule, HTTPBasicAuthModule
+    from red_ai.exploit.modules import (HTTPFlagReadModule, WebFlagHuntModule, HTTPBasicAuthModule,
+                                        LFIModule, SQLiModule, CommandInjectionModule)
     from red_ai.exploit.controller import ExploitController
     from red_ai.exploit.bridge import surfaces_from_recon
 
@@ -270,6 +271,9 @@ def cmd_engage(root: Path, args) -> int:
     registry = ExploitModuleRegistry()
     registry.register(WebFlagHuntModule())
     registry.register(HTTPBasicAuthModule())
+    registry.register(LFIModule())
+    registry.register(SQLiModule())
+    registry.register(CommandInjectionModule())
     registry.register(HTTPFlagReadModule())
 
     exploit_out = root / "runs" / f"{stamp}-engage-exploit"

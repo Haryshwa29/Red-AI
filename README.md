@@ -42,7 +42,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (174 tests)
+python -m unittest discover -s tests -v # offline test suite (180 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 ```
 
@@ -126,16 +126,20 @@ gated, discovery-driven **web flag hunt** and captures the declared flag form
 (`THM{…}`/`flag{…}`/`HTB{…}`/32-hex) with a reproduced, zero-false-positive
 check — all driven by one `engage` command (see the runbook above).
 
-Web credential access is in: an HTTP Basic-auth **default-credential** module
-(reacts only to a server-issued Basic challenge, tries a small stated list like
-`admin:admin`, and reports acceptance as a weak-credential finding).
+Web exploit coverage now clears the whole graded range (L1–L8): exposed-file and
+discovery-driven flag capture, HTML-link crawling, HTTP Basic **default
+credentials**, and the **injection family** — LFI / path traversal, SQL
+injection, and command injection — each a native, gated, bounded, read-only
+module behind the exploit interface.
 
-Not yet: exploit coverage beyond that — SSH/FTP brute force and password spray,
-SQL injection, LFI / path traversal, file-upload bypass, RCE, and privilege
-escalation are each a planned, separately-gated module, not a silent omission.
-Semantic tier-3 LLM detection remains a declared gap. Progress against these is
-tracked by the offline capability range (`python -m redai_range`,
-[`docs/CAPABILITY_RANGE.md`](docs/CAPABILITY_RANGE.md)).
+Not yet: password spray (with lockout awareness) and SSH/FTP brute force,
+form-login / token auth, blind / time-based injection, second-order injection,
+file-upload bypass, multi-step chains, and privilege escalation (`user.txt` →
+`root.txt`); plus non-web services. Each is a planned, separately-gated module,
+not a silent omission. Semantic tier-3 LLM detection remains a declared gap.
+Progress is tracked by the offline capability range (`python -m redai_range`,
+[`docs/CAPABILITY_RANGE.md`](docs/CAPABILITY_RANGE.md)); clearing it is the floor
+of competence, not the ceiling.
 
 New in this build: a real local **model backend** behind the existing
 `ModelProvider` seam (Ollama + OpenAI-compatible, stdlib-only, offline) and a

@@ -26,12 +26,20 @@ capture already handles — so a rung fails only when the engine can't *reach* i
 | L3 | flag leaked inside an exposed `.env` | secret-file body scan | ✅ cleared |
 | L4 | flag only reachable via an HTML link | HTML link extraction | ✅ cleared |
 | L5 | flag behind HTTP Basic auth (`admin:admin`) | credential access / auth | ✅ cleared |
-| L6 | local file inclusion on `?file=` | LFI / path traversal | ⛔ frontier |
-| L7 | hidden DB row via SQL injection | SQL injection | ⛔ not yet |
-| L8 | command injection on `?host=` | command injection / RCE | ⛔ not yet |
+| L6 | local file inclusion on `?file=` | LFI / path traversal | ✅ cleared |
+| L7 | hidden DB row via SQL injection | SQL injection | ✅ cleared |
+| L8 | command injection on `?host=` | command injection / RCE | ✅ cleared |
 
-**Frontier today: L1–L5.** First gap: **L6 (LFI / path traversal)** — the next
-capability to build. See `docs/RANGE_REPORT.md` for the latest generated run.
+**Frontier today: L1–L8 — the ladder is fully cleared.** The next work is to
+*raise the ceiling*: harder rungs (password spray with lockout awareness,
+form/token auth, blind/boolean SQLi, second-order injection, multi-step chains,
+`user.txt`→`root.txt` privilege escalation) and non-web services (SSH/FTP). See
+`docs/RANGE_REPORT.md` for the latest generated run.
+
+> The ladder measures *reachability of a `THM{…}` flag over HTTP against
+> single-step, non-blind vulnerabilities*. Clearing it is the floor of
+> competence, not the ceiling — real boxes add blind/time-based variants, WAFs,
+> chained steps and privilege escalation. New rungs encode those.
 
 ## Running it
 

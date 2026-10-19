@@ -22,17 +22,21 @@ capture.** Given an authorized web surface it will:
    a 32-hex). The controller re-checks and re-runs the capture to report a
    measured reproduction rate.
 
-**This solves the common easy web-box shape**: a flag exposed at a guessable or
+**This solves the common web-box shapes**: a flag exposed at a guessable or
 `robots`-disclosed path, in an exposed `.env`/`.git`, on a page reachable by
-following a homepage link, or behind HTTP Basic auth that accepts **default
-credentials** (e.g. `admin:admin` — reported as a weak-credential finding).
+following a homepage link, behind HTTP Basic auth that accepts **default
+credentials** (`admin:admin`), or reachable through a **single-step injection** on
+a discovered parameter — **LFI / path traversal, SQL injection, or command
+injection** (bounded, read-only payloads that prove the flaw and read the flag).
 
-**It does NOT yet do** (each is a planned, separately-gated module — not a silent
-gap): SSH/FTP credential brute force and password spray, form-login / token auth,
-SQL injection / database dumping, LFI / path traversal payloads, file-upload
-bypass, RCE / reverse shells, or privilege escalation. If a box needs those to
-reach the flag, RED-AI will recon it, report what it found, and stop at
-`no_breach` — which is honest signal ("not broken in N steps"), never "secure".
+**It does NOT yet do** (each a planned, separately-gated module — not a silent
+gap): SSH/FTP brute force and password spray with lockout awareness, form-login /
+token auth, **blind / time-based** SQLi or injection, second-order injection,
+file-upload bypass, interactive RCE / reverse shells, multi-step chains, and
+privilege escalation (`user.txt` → `root.txt`); plus non-web services. If a box
+needs those to reach the flag, RED-AI will recon and probe it, report what it
+found, and stop at `no_breach` — honest signal ("not broken in N steps"), never
+"secure".
 
 > **Pick boxes accordingly for Checkpoint 2.** Target TryHackMe rooms whose flag
 > is reachable over HTTP without an exploit chain (exposed files, `robots.txt`

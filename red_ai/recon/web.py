@@ -66,6 +66,39 @@ _HREF = re.compile(rb"""(?:href|src)\s*=\s*["']([^"']+)["']""", re.I)
 _MAX_LINKS = 40
 
 
+def _extract_params(body: bytes, host: str) -> "list[dict]":
+    """Same-origin parameterized endpoints linked from a page (path + param + sample).
+
+    A link like `/view?file=welcome.txt` tells us there is an injectable input
+    `file` on `/view`. Recorded as recon knowledge and fed to the injection
+    modules, which decide which payloads to try -- discovery stays recon's job,
+    exploitation the module's. Bounded, one level, deterministic."""
+    from urllib.parse import urlparse, parse_qsl
+    out: list[dict] = []
+    seen: set[str] = set()
+    for raw in _HREF.findall(body or b""):
+        u = raw.decode("utf-8", "replace").strip()
+        if "?" not in u or u[0] == "#":
+            continue
+        if u.lower().startswith(("http://", "https://")):
+            pr = urlparse(u)
+            if pr.hostname != host:
+                continue
+            path, qs = pr.path, pr.query
+        else:
+            path, _, qs = u.partition("?")
+            if not path.startswith("/"):
+                path = "/" + path
+        for k, v in parse_qsl(qs):
+            key = f"{path}?{k}"
+            if k and key not in seen:
+                seen.add(key)
+                out.append({"path": path, "param": k, "sample": v})
+            if len(out) >= _MAX_LINKS:
+                return out
+    return out
+
+
 def _extract_links(body: bytes, host: str) -> "list[dict]":
     """Same-origin paths linked from a page body (one level, bounded).
 
@@ -137,6 +170,7 @@ def enumerate_web(host: str, port: int, scheme: str = "http",
         title = m.group(1).decode("utf-8", "replace").strip()[:120]
     root = {"status": status, "server": headers.get("Server"), "title": title}
     linked = _extract_links(body, host) if status else []   # same-origin homepage links
+    params = _extract_params(body, host) if status else []  # parameterized endpoints
 
     findings, leads, paths = [], [], []
     disclosed: list[dict] = []   # paths named inside robots.txt (recon knowledge, not a finding)
@@ -155,4 +189,4 @@ def enumerate_web(host: str, port: int, scheme: str = "http",
                 disclosed.extend(_parse_robots(body_p))
     findings.sort(key=lambda f: -f["severity_rank"])
     return {"root": root, "paths": paths, "findings": findings,
-            "leads": leads, "disclosed": disclosed, "linked": linked}
+            "leads": leads, "disclosed": disclosed, "linked": linked, "params": params}

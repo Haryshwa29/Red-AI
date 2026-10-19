@@ -49,17 +49,19 @@ perform — only the operator can close this, because the lab network is reachab
 only from their machine. This is the checkpoint that converts "built and
 lab-proven" into "works in the wild."
 
-**Capability status — READY, awaiting the live run.** The discovery-driven
-capture path that CP2 needs is now built and proven over **real sockets** (not
-mocks) against deliberately-vulnerable local servers:
-- a one-command `engage` flow: recon → recon→exploit bridge → gated flag hunt,
-  with a live timestamped progress stream;
+**Capability status — READY, awaiting the live run.** The capture path CP2 needs
+is built and proven over **real sockets** (not mocks) against deliberately-
+vulnerable local servers, and now measured by a graded capability range:
+- a one-command `engage` flow: recon → recon→exploit bridge → gated exploit, with
+  a live timestamped progress stream;
 - a `pattern` flag kind that captures the flag **form** (`THM{…}`/`flag{…}`/
   `HTB{…}`/32-hex) with no pre-declared path — zero-false-positive, reproduced;
-- proven discovery-driven: with the flag behind a **custom `robots.txt`-disclosed
-  dir not in any wordlist**, RED-AI followed the breadcrumb and captured
-  `THM{r3con_t0_expl01t_br1dge}` in 3 steps, reproduction 1.0, evidence verified;
-- 164 offline tests (was 157), incl. the module, the matcher, and the bridge.
+- a graded range (`python -m redai_range`) of 8 THM-archetype boxes, **all
+  cleared L1–L8**: exposed file, robots breadcrumb, `.env` leak, HTML-link crawl,
+  Basic-auth default creds, and the injection family (LFI, SQLi, command
+  injection) — 0 false positives, 0 regressions;
+- 180 offline tests (was 157), incl. every module, the matcher, the bridge, and a
+  range rot-guard.
 
 **To close it (operator, on VPN):**
 ```
@@ -67,15 +69,18 @@ python -m red_ai operator add <you>
 python -m red_ai engage --target <box-ip> --ports 80,8080,8000,8888,443 --operator <you>
 python -m red_ai verify data/runs/<ts>-engage-exploit
 ```
-See **[docs/THM_RUNBOOK.md](docs/THM_RUNBOOK.md)** for the full procedure, box
-selection, and the honest scope of what captures today (web boxes) vs. what does
-not yet (SSH brute / SQLi / RCE / privesc).
+See **[docs/THM_RUNBOOK.md](docs/THM_RUNBOOK.md)** for the full procedure and the
+honest scope, and **[docs/CAPABILITY_RANGE.md](docs/CAPABILITY_RANGE.md)** for the
+capability map. The range is the floor of competence; the live box is the proof.
 
 ---
 
-## Checkpoint 3 — Toward bug-bounty  ·  FUTURE
+## Checkpoint 3 — Toward bug-bounty  ·  IN PROGRESS
 
-A broader native exploit-module set (auth bypass, known-CVE, injection), web-app
-depth, and validated tool-parity adapters (nmap/Burp/msf) — each a gated,
-separately-reviewed module behind the shipped exploit interface, each validated
-on a real box before it is called "ready".
+Raise the ceiling above the L1–L8 single-step web range: password spray (lockout-
+aware) and SSH/FTP brute, form/token auth, **blind / time-based** and second-order
+injection, file-upload bypass, multi-step chains, and privilege escalation
+(`user.txt` → `root.txt`); plus validated tool-parity adapters (nmap/Burp/msf).
+Each a gated, separately-reviewed module behind the shipped exploit interface,
+each encoded as a new range rung and validated on a real box before it is called
+"ready".
