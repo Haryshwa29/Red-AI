@@ -42,7 +42,8 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (164 tests)
+python -m unittest discover -s tests -v # offline test suite (169 tests)
+python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 ```
 
 ### Live engagement (recon → exploit → capture the flag)

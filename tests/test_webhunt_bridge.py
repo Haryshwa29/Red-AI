@@ -21,7 +21,7 @@ from red_ai.exploit import (ExploitScope, FlagDefinition, TargetSurface,
 from red_ai.exploit.controller import ExploitController
 from red_ai.exploit.modules.web_flag_hunt import WebFlagHuntModule, _candidate_paths
 from red_ai.exploit.bridge import surfaces_from_recon
-from red_ai.recon.web import _parse_robots
+from red_ai.recon.web import _parse_robots, _extract_links
 
 FLAG = "THM{r3con_t0_expl01t_br1dge}"
 PATTERN = r"(?:THM|FLAG|HTB|flag)\{[^}]{1,128}\}"
@@ -105,6 +105,24 @@ class TestReconExploitBridge(unittest.TestCase):
         body = b"User-agent: *\nDisallow: /z9-area/\nDisallow: /admin/\nAllow: /\n"
         got = {d["path"] for d in _parse_robots(body)}
         self.assertEqual(got, {"/z9-area/", "/admin/"})   # "/" is skipped
+
+    def test_extract_links_same_origin_only(self):
+        body = (b'<a href="/a/b.txt">x</a>'
+                b'<a href="http://evil.com/x">y</a>'
+                b'<a href="http://127.0.0.1/c.txt">z</a>'
+                b'<a href="#frag">f</a>'
+                b'<a href="rel.txt">r</a>'
+                b'<script src="/s.js"></script>')
+        got = {d["path"] for d in _extract_links(body, "127.0.0.1")}
+        self.assertEqual(got, {"/a/b.txt", "/c.txt", "/rel.txt", "/s.js"})  # evil.com + #frag excluded
+
+    def test_bridge_surfaces_linked_facts(self):
+        recon = {"open": [{"host": "10.10.1.9", "port": 80, "service": "unknown",
+                           "web": {"root": {"status": 200},
+                                   "linked": [{"path": "/n4k8-internal/notes.txt",
+                                               "meaning": "linked from homepage"}]}}]}
+        _, facts = surfaces_from_recon(recon)
+        self.assertTrue(any("/n4k8-internal/notes.txt" in f and "linked" in f for f in facts))
 
 
 if __name__ == "__main__":
