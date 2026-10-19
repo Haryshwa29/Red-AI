@@ -23,11 +23,13 @@ from red_ai.recon.analyst import annotate
 
 class ReconController:
     def __init__(self, scope: ReconScope, output, *, scanner=None, provider=None,
-                 cancel_file=None, banner_opener=None, verbose=False, web_opener=None):
+                 cancel_file=None, banner_opener=None, verbose=False, web_opener=None,
+                 on_event=None):
         self.scope = scope
         self.banner_opener = banner_opener
         self.verbose = verbose
         self.web_opener = web_opener
+        self.on_event = on_event
         self.output = Path(output)
         self.scanner = scanner or TcpConnectScanner(
             timeout_ms=scope.timeout_ms, concurrency=scope.concurrency)
@@ -46,7 +48,7 @@ class ReconController:
         self.started = time.monotonic()
         self.output.mkdir(parents=True, exist_ok=False)
         run_id = self.output.name
-        journal = Journal(self.output / "events.jsonl")
+        journal = Journal(self.output / "events.jsonl", on_event=self.on_event)
         journal.append("run_started", {
             "run_id": run_id, "engine": "recon.tcp_connect", "scope": self.scope,
             "hosts": list(self.scope.hosts), "ports": len(self.scope.ports),

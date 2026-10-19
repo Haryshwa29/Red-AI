@@ -82,6 +82,11 @@ python -m red_ai engage \
     --operator <your-handle>
 ```
 
+> **Prefer a visual, learn-as-you-go view?** Run the local web console instead —
+> same pipeline, a stage-by-stage timeline and an annotated live feed:
+> `python -m red_ai web` → http://127.0.0.1:8787 (localhost only). See
+> [`WEB_UI.md`](WEB_UI.md).
+
 You will see a live, timestamped stream of exactly what it does:
 
 ```

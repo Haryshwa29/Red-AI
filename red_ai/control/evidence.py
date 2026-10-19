@@ -35,12 +35,16 @@ def jsonable(obj):
 
 
 class Journal:
-    def __init__(self, path):
+    def __init__(self, path, on_event=None):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = self.path.open("x", encoding="utf-8")
         self.previous = "0" * 64
         self.sequence = 0
+        # Optional read-only observer (e.g. a live UI). It runs AFTER the event is
+        # written and hashed, and any error it raises is swallowed -- an observer
+        # can never corrupt or block the evidence record.
+        self.on_event = on_event
 
     def append(self, kind: str, payload) -> dict:
         event = {"sequence": self.sequence, "timestamp": now().isoformat(), "kind": kind,
@@ -50,6 +54,11 @@ class Journal:
         self.handle.flush()
         self.previous = event["hash"]
         self.sequence += 1
+        if self.on_event is not None:
+            try:
+                self.on_event(event)
+            except Exception:
+                pass  # an observer must never break evidence recording
         return event
 
     def close(self):

@@ -42,7 +42,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (180 tests)
+python -m unittest discover -s tests -v # offline test suite (186 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 ```
 
@@ -62,6 +62,18 @@ python -m red_ai verify data/runs/<ts>-engage-exploit
 Full procedure, box selection, and the honest scope of what captures today
 (web boxes) vs. not yet (SSH brute / SQLi / RCE / privesc) are in
 [`docs/THM_RUNBOOK.md`](docs/THM_RUNBOOK.md).
+
+### Watch it live (web console)
+
+Prefer a visual, step-by-step view? Run the local web console on the same
+(VPN-connected) machine and watch the engagement unfold with plain-English
+explanations of each phase — built for learning the CTF method:
+
+```bash
+python -m red_ai web            # → http://127.0.0.1:8787 (localhost only)
+```
+
+See [`docs/WEB_UI.md`](docs/WEB_UI.md).
 
 Single run against one simulation level:
 

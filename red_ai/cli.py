@@ -201,103 +201,38 @@ def cmd_engage(root: Path, args) -> int:
     surface with recon, promotes it across the bridge, then runs the gated exploit
     engine to capture the declared flag FORM. Every step is gated and every event
     hash-linked; the brain is not involved (pure deterministic capability)."""
-    from datetime import timedelta
-    from red_ai.recon.scope import ReconScope
-    from red_ai.recon.controller import ReconController
-    from red_ai.exploit.scope import ExploitScope
-    from red_ai.exploit.contracts import FlagDefinition
-    from red_ai.exploit.module import ExploitModuleRegistry
-    from red_ai.exploit.modules import (HTTPFlagReadModule, WebFlagHuntModule, HTTPBasicAuthModule,
-                                        LFIModule, SQLiModule, CommandInjectionModule)
-    from red_ai.exploit.controller import ExploitController
-    from red_ai.exploit.bridge import surfaces_from_recon
+    from red_ai.engage import engage_core, EngageError
 
     verbose = not args.quiet
-    # Operator identity must exist (per-operator key); this also records WHO ran it.
-    keyring = Keyring(root)
-    try:
-        keyring.key(args.operator)
-    except (KeyError, FileNotFoundError):
-        print(f"RED-AI: unknown operator '{args.operator}'. Create one: "
-              f"python -m red_ai operator add {args.operator}", file=sys.stderr)
-        return 1
-    if args.env == "production" and not args.allow_production:
-        print("RED-AI: engaging a production target requires --allow-production", file=sys.stderr)
-        return 1
-
-    stamp = now().strftime("%Y%m%dT%H%M%S")
-    # Unique run tag so concurrent engagements in one data dir never collide on the
-    # run-dir name (timestamp alone is per-second). Sortable + unique.
-    run_tag = f"{stamp}-{secrets.token_hex(2)}"
-    valid_from = (now() - timedelta(minutes=1)).isoformat()
-    valid_until = (now() + timedelta(hours=2)).isoformat()
-
-    # --- 1) RECON (service ID + web enum, streamed) --------------------------
-    recon_scope = ReconScope.build(
-        scope_id=f"engage-recon-{stamp}", owner=args.target, authorised_by=args.operator,
-        hosts=args.target, ports=args.ports, attestation=args.attestation,
-        owner_attested=True, environment=args.env, allow_production=args.allow_production,
-        identify_services=True, enumerate_web=True,
-        valid_from=valid_from, valid_until=valid_until)
-    recon_out = root / "runs" / f"{run_tag}-engage-recon"
     if verbose:
         print(f"[{now().strftime('%H:%M:%S')}] [engage] target={args.target} ports={args.ports} "
               f"env={args.env} operator={args.operator}", flush=True)
-    recon_summary = ReconController(recon_scope, recon_out, cancel_file=root / "STOP",
-                                    verbose=verbose).run()
+    try:
+        res = engage_core(root=root, target=args.target, ports=args.ports,
+                          flag_pattern=args.flag_pattern, env=args.env,
+                          attestation=args.attestation, allow_production=args.allow_production,
+                          max_steps=args.max_steps, max_seconds=args.max_seconds,
+                          operator=args.operator, verbose=verbose)
+    except EngageError as e:
+        print(f"RED-AI: {e}", file=sys.stderr)
+        return 1
 
-    surfaces, facts = surfaces_from_recon(recon_summary)
-    web_surfaces = [s for s in surfaces if (str(s.service or "").upper().startswith("HTTP")
-                    or s.port in {80, 443, 591, 8000, 8008, 8080, 8888})]
-    if verbose:
-        print(f"[{now().strftime('%H:%M:%S')}] [engage] recon found {len(surfaces)} open surface(s), "
-              f"{len(web_surfaces)} web; {len(facts)} established fact(s)", flush=True)
-    if not web_surfaces:
+    if res["status"] == "no_web_surface":
         print("RED-AI: no reachable web surface discovered -- nothing to hunt. "
               "(Web flag capture is the capability shipped today; see docs/THM_RUNBOOK.md.)")
-        print(f"    recon evidence: {recon_out.resolve()}")
+        print(f"    recon evidence: {Path(res['recon_out']).resolve()}")
         return 0
 
-    # --- 2) EXPLOIT SCOPE (in-process; carries the operator's attestation) ---
-    flag = FlagDefinition(
-        kind="pattern",
-        description=f"Any platform flag token returned by an authorized web surface on {args.target}",
-        target_ref="a response body on an in-scope web surface",
-        expected=args.flag_pattern)
-    xscope = ExploitScope(
-        scope_id=f"engage-exploit-{stamp}", owner=args.target, authorised_by=args.operator,
-        surfaces=tuple(s.id for s in web_surfaces), flag=flag,
-        valid_from=valid_from, valid_until=valid_until, attestation=args.attestation,
-        owner_attested=True, environment=args.env, allow_production=args.allow_production,
-        engagement_type="pentest", max_steps=args.max_steps, max_seconds=args.max_seconds)
-
-    registry = ExploitModuleRegistry()
-    registry.register(WebFlagHuntModule())
-    registry.register(HTTPBasicAuthModule())
-    registry.register(LFIModule())
-    registry.register(SQLiModule())
-    registry.register(CommandInjectionModule())
-    registry.register(HTTPFlagReadModule())
-
-    exploit_out = root / "runs" / f"{run_tag}-engage-exploit"
-    summary = ExploitController(xscope, exploit_out, registry, surfaces=web_surfaces,
-                                established_facts=facts, provider=None,
-                                cancel_file=root / "STOP", verbose=verbose).run()
-
-    # --- 3) REPORT ------------------------------------------------------------
-    captured = summary["flag"]["captured"]
     print()
-    if captured:
-        fv = next((f.get("flag_value") for f in summary.get("findings", []) if f.get("flag_value")), "")
-        rate = summary["flag"]["rate"]
-        print(f"RED-AI: FLAG CAPTURED on {args.target}  ->  {fv or '(file read)'}")
-        print(f"    reproduced: {rate:.0%}  ·  steps: {summary['steps']}")
+    if res["captured"]:
+        print(f"RED-AI: FLAG CAPTURED on {args.target}  ->  {res['flag_value'] or '(file read)'}")
+        print(f"    reproduced: {res['rate']:.0%}  ·  steps: {res['steps']}")
     else:
-        print(f"RED-AI: no flag captured ({summary['outcome']}). "
-              f"Not broken in {summary['steps']} step(s) -- this is signal, not 'secure'.")
-    print(f"    recon evidence:   {recon_out.resolve()}")
-    print(f"    exploit evidence: {exploit_out.resolve()}")
-    print(f"    verify:  python -m red_ai verify {exploit_out}")
+        print(f"RED-AI: no flag captured ({res['outcome']}). "
+              f"Not broken in {res['steps']} step(s) -- this is signal, not 'secure'.")
+    print(f"    recon evidence:   {Path(res['recon_out']).resolve()}")
+    print(f"    exploit evidence: {Path(res['exploit_out']).resolve()}")
+    print(f"    verify:  python -m red_ai verify {res['exploit_out']}")
     return 0
 
 
@@ -334,6 +269,9 @@ def main(argv=None) -> int:
     en.add_argument("--max-seconds", type=int, default=600)
     en.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
     en.add_argument("--quiet", action="store_true", help="suppress the live progress stream")
+    web = sub.add_parser("web", help="launch the local web console (watch an engagement live)")
+    web.add_argument("--host", default="127.0.0.1", help="bind address (default localhost; keep it local)")
+    web.add_argument("--port", type=int, default=8787)
     op = sub.add_parser("operator", help="manage operator identities (keys)")
     op.add_argument("op_action", choices=["add", "list"]); op.add_argument("op_id", nargs="?")
     sub.add_parser("doctor")
@@ -413,6 +351,9 @@ def main(argv=None) -> int:
             execute_engine(scope, root, args.level)
         elif args.command == "engage":
             return cmd_engage(root, args)
+        elif args.command == "web":
+            from red_ai.web.server import serve
+            serve(host=args.host, port=args.port, data_dir=root)
         elif args.command == "operator":
             keyring = Keyring(root)
             if args.op_action == "add":
