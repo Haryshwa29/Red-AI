@@ -42,7 +42,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (169 tests)
+python -m unittest discover -s tests -v # offline test suite (174 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 ```
 
@@ -126,10 +126,16 @@ gated, discovery-driven **web flag hunt** and captures the declared flag form
 (`THM{…}`/`flag{…}`/`HTB{…}`/32-hex) with a reproduced, zero-false-positive
 check — all driven by one `engage` command (see the runbook above).
 
-Not yet: exploit coverage beyond web flag capture — SSH/FTP credential brute
-force, SQL injection, LFI / path traversal, file-upload bypass, RCE, and
-privilege escalation are each a planned, separately-gated module, not a silent
-omission. Semantic tier-3 LLM detection remains a declared gap.
+Web credential access is in: an HTTP Basic-auth **default-credential** module
+(reacts only to a server-issued Basic challenge, tries a small stated list like
+`admin:admin`, and reports acceptance as a weak-credential finding).
+
+Not yet: exploit coverage beyond that — SSH/FTP brute force and password spray,
+SQL injection, LFI / path traversal, file-upload bypass, RCE, and privilege
+escalation are each a planned, separately-gated module, not a silent omission.
+Semantic tier-3 LLM detection remains a declared gap. Progress against these is
+tracked by the offline capability range (`python -m redai_range`,
+[`docs/CAPABILITY_RANGE.md`](docs/CAPABILITY_RANGE.md)).
 
 New in this build: a real local **model backend** behind the existing
 `ModelProvider` seam (Ollama + OpenAI-compatible, stdlib-only, offline) and a

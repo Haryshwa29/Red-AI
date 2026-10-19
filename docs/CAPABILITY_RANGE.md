@@ -25,12 +25,12 @@ capture already handles — so a rung fails only when the engine can't *reach* i
 | L2 | custom dir disclosed in `robots.txt` | robots follow | ✅ cleared |
 | L3 | flag leaked inside an exposed `.env` | secret-file body scan | ✅ cleared |
 | L4 | flag only reachable via an HTML link | HTML link extraction | ✅ cleared |
-| L5 | flag behind HTTP Basic auth (`admin:admin`) | credential access / auth | ⛔ frontier |
-| L6 | local file inclusion on `?file=` | LFI / path traversal | ⛔ not yet |
+| L5 | flag behind HTTP Basic auth (`admin:admin`) | credential access / auth | ✅ cleared |
+| L6 | local file inclusion on `?file=` | LFI / path traversal | ⛔ frontier |
 | L7 | hidden DB row via SQL injection | SQL injection | ⛔ not yet |
 | L8 | command injection on `?host=` | command injection / RCE | ⛔ not yet |
 
-**Frontier today: L1–L4.** First gap: **L5 (credential access)** — the next
+**Frontier today: L1–L5.** First gap: **L6 (LFI / path traversal)** — the next
 capability to build. See `docs/RANGE_REPORT.md` for the latest generated run.
 
 ## Running it

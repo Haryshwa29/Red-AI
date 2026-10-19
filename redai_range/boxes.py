@@ -197,7 +197,7 @@ BOXES: tuple[Box, ...] = (
         "HTML link extraction / crawling", True, _L4_FLAG, _l4,
         Solution("/n4k8-internal/notes.txt")),
     Box("L5", "basic-auth-default-creds", 5, "flag behind HTTP Basic auth (admin:admin)",
-        "credential access / auth", False, _L5_FLAG, _l5,
+        "credential access / auth", True, _L5_FLAG, _l5,
         Solution("/flag.txt", headers={"Authorization": _L5_OK})),
     Box("L6", "lfi-path-traversal", 6, "flag via local file inclusion on ?file=",
         "LFI / path-traversal injection", False, _L6_FLAG, _l6,
