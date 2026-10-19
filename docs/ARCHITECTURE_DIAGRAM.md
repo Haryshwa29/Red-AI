@@ -7,7 +7,7 @@ boundaries see [`MODEL_ROLES_AND_TRUST.md`](MODEL_ROLES_AND_TRUST.md).
 ## Animated pipeline
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Haryshwa29/Red-AI/main/docs/architecture.svg">
+  <a href="https://github.com/Haryshwa29/Red-AI/blob/main/docs/architecture.svg">
     <img src="architecture.svg" alt="RED-AI animated architecture" width="100%">
   </a>
 </p>
@@ -26,7 +26,7 @@ flowchart TB
   end
 
   OBJ["OBJECTIVE / ONBOARDING<br/>declared assets · canary / flag"]
-  KN["KNOWLEDGE SYSTEM<br/>trusted facts  ⟂  quarantined target text"]
+  KN["KNOWLEDGE SYSTEM<br/>trusted facts vs quarantined target text"]
   BR["STRATEGIST (brain) — optional<br/>the client's own LLM<br/>reorders a closed set · never authors attacks"]
   RT["CAPABILITY ROUTER<br/>closed set · native-first · explainable"]
   GATE{"GATE<br/>deterministic allow / deny<br/>tier authority · fail-closed"}

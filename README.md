@@ -17,7 +17,7 @@ simulations only in this release.
 ## Architecture at a glance
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Haryshwa29/Red-AI/main/docs/architecture.svg">
+  <a href="https://github.com/Haryshwa29/Red-AI/blob/main/docs/architecture.svg">
     <img src="docs/architecture.svg" alt="RED-AI architecture — animated pipeline" width="100%">
   </a>
 </p>
