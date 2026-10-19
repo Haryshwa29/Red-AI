@@ -61,6 +61,27 @@ def _urllib_opener(url: str, timeout_s: float):
         return 0, {}, b""
 
 
+_ROBOTS_LINE = re.compile(rb"(?im)^\s*(?:dis)?allow\s*:\s*(\S+)")
+
+
+def _parse_robots(body: bytes) -> "list[dict]":
+    """Extract Disallow/Allow paths from a robots.txt body.
+
+    robots.txt routinely names exactly the paths an owner wants hidden -- the
+    first place a pentester looks. These are recon-established knowledge (the
+    server disclosed them), fed to the exploit engine as candidate paths; they
+    are not themselves a finding."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for m in _ROBOTS_LINE.findall(body or b""):
+        p = m.decode("utf-8", "replace").strip()
+        if not p.startswith("/") or p in seen or p == "/":
+            continue
+        seen.add(p)
+        out.append({"path": p, "meaning": "path disclosed by robots.txt"})
+    return out
+
+
 def _get(base: str, path: str, opener: WebOpener, timeout_s: float):
     try:
         return opener(base + path, timeout_s)
@@ -83,9 +104,10 @@ def enumerate_web(host: str, port: int, scheme: str = "http",
     root = {"status": status, "server": headers.get("Server"), "title": title}
 
     findings, leads, paths = [], [], []
+    disclosed: list[dict] = []   # paths named inside robots.txt (recon knowledge, not a finding)
     if status:  # only probe paths if the root answered like a web server
         for path, meaning, sev in COMMON_PATHS:
-            st, _h, _b = _get(base, path, opener, timeout_s)
+            st, _h, body_p = _get(base, path, opener, timeout_s)
             if st not in (200, 301, 302, 401, 403):
                 continue
             entry = {"path": path, "status": st, "meaning": meaning}
@@ -94,5 +116,8 @@ def enumerate_web(host: str, port: int, scheme: str = "http",
                 findings.append({**entry, "severity": sev.value, "severity_rank": sev.rank})
             elif path in _LEAD_PATHS and st in (200, 301, 302, 401):
                 leads.append(entry)
+            if path == "/robots.txt" and st == 200:
+                disclosed.extend(_parse_robots(body_p))
     findings.sort(key=lambda f: -f["severity_rank"])
-    return {"root": root, "paths": paths, "findings": findings, "leads": leads}
+    return {"root": root, "paths": paths, "findings": findings,
+            "leads": leads, "disclosed": disclosed}

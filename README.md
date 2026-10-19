@@ -42,8 +42,25 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # 23 offline tests
+python -m unittest discover -s tests -v # offline test suite (164 tests)
 ```
+
+### Live engagement (recon → exploit → capture the flag)
+
+Run on a machine with a route to the authorized target (e.g. connected to a
+TryHackMe / HackTheBox VPN). One command runs recon, bridges what it discovered
+into the exploit engine, and hunts the declared flag form — every step gated,
+every event hash-linked, with a live timestamped stream:
+
+```bash
+python -m red_ai operator add <your-handle>          # one-time, per-operator key
+python -m red_ai engage --target <box-ip> --ports 80,8080,8000,8888,443 --operator <your-handle>
+python -m red_ai verify data/runs/<ts>-engage-exploit
+```
+
+Full procedure, box selection, and the honest scope of what captures today
+(web boxes) vs. not yet (SSH brute / SQLi / RCE / privesc) are in
+[`docs/THM_RUNBOOK.md`](docs/THM_RUNBOOK.md).
 
 Single run against one simulation level:
 
@@ -101,8 +118,17 @@ skill-plugin registry, model-provider seam with an offline mock, and a
 reviewed-finding memory corpus (operator-attested, reproducible findings only,
 with revocation and audit).
 
-Not yet: instrumented / HTTP / network *targets*, and semantic tier-3
-detection. Each is a registered next step, not a silent omission.
+Also implemented (network side): a live HTTP **target adapter** for the LLM
+engine, a **recon engine** (TCP connect scan → service/version ID → read-only
+web enumeration), and an **exploit engine** that bridges recon discovery into a
+gated, discovery-driven **web flag hunt** and captures the declared flag form
+(`THM{…}`/`flag{…}`/`HTB{…}`/32-hex) with a reproduced, zero-false-positive
+check — all driven by one `engage` command (see the runbook above).
+
+Not yet: exploit coverage beyond web flag capture — SSH/FTP credential brute
+force, SQL injection, LFI / path traversal, file-upload bypass, RCE, and
+privilege escalation are each a planned, separately-gated module, not a silent
+omission. Semantic tier-3 LLM detection remains a declared gap.
 
 New in this build: a real local **model backend** behind the existing
 `ModelProvider` seam (Ollama + OpenAI-compatible, stdlib-only, offline) and a

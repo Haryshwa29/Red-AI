@@ -192,6 +192,107 @@ def _authorize_run_read(root: Path, run_dir: Path, operator_id: str) -> None:
     authorize_read(Scope.from_dict(scope_dict), operator_id, Keyring(root))
 
 
+def cmd_engage(root: Path, args) -> int:
+    """Live network engagement: recon -> bridge -> exploit -> capture, one command.
+
+    This is the entrypoint an operator runs ON A MACHINE WITH A ROUTE TO THE TARGET
+    (e.g. connected to the TryHackMe/HackTheBox VPN). It authorizes the engagement
+    up front (operator identity + owner attestation + environment), discovers the
+    surface with recon, promotes it across the bridge, then runs the gated exploit
+    engine to capture the declared flag FORM. Every step is gated and every event
+    hash-linked; the brain is not involved (pure deterministic capability)."""
+    from datetime import timedelta
+    from red_ai.recon.scope import ReconScope
+    from red_ai.recon.controller import ReconController
+    from red_ai.exploit.scope import ExploitScope
+    from red_ai.exploit.contracts import FlagDefinition
+    from red_ai.exploit.module import ExploitModuleRegistry
+    from red_ai.exploit.modules import HTTPFlagReadModule, WebFlagHuntModule
+    from red_ai.exploit.controller import ExploitController
+    from red_ai.exploit.bridge import surfaces_from_recon
+
+    verbose = not args.quiet
+    # Operator identity must exist (per-operator key); this also records WHO ran it.
+    keyring = Keyring(root)
+    try:
+        keyring.key(args.operator)
+    except (KeyError, FileNotFoundError):
+        print(f"RED-AI: unknown operator '{args.operator}'. Create one: "
+              f"python -m red_ai operator add {args.operator}", file=sys.stderr)
+        return 1
+    if args.env == "production" and not args.allow_production:
+        print("RED-AI: engaging a production target requires --allow-production", file=sys.stderr)
+        return 1
+
+    stamp = now().strftime("%Y%m%dT%H%M%S")
+    valid_from = (now() - timedelta(minutes=1)).isoformat()
+    valid_until = (now() + timedelta(hours=2)).isoformat()
+
+    # --- 1) RECON (service ID + web enum, streamed) --------------------------
+    recon_scope = ReconScope.build(
+        scope_id=f"engage-recon-{stamp}", owner=args.target, authorised_by=args.operator,
+        hosts=args.target, ports=args.ports, attestation=args.attestation,
+        owner_attested=True, environment=args.env, allow_production=args.allow_production,
+        identify_services=True, enumerate_web=True,
+        valid_from=valid_from, valid_until=valid_until)
+    recon_out = root / "runs" / f"{stamp}-engage-recon"
+    if verbose:
+        print(f"[{now().strftime('%H:%M:%S')}] [engage] target={args.target} ports={args.ports} "
+              f"env={args.env} operator={args.operator}", flush=True)
+    recon_summary = ReconController(recon_scope, recon_out, cancel_file=root / "STOP",
+                                    verbose=verbose).run()
+
+    surfaces, facts = surfaces_from_recon(recon_summary)
+    web_surfaces = [s for s in surfaces if (str(s.service or "").upper().startswith("HTTP")
+                    or s.port in {80, 443, 591, 8000, 8008, 8080, 8888})]
+    if verbose:
+        print(f"[{now().strftime('%H:%M:%S')}] [engage] recon found {len(surfaces)} open surface(s), "
+              f"{len(web_surfaces)} web; {len(facts)} established fact(s)", flush=True)
+    if not web_surfaces:
+        print("RED-AI: no reachable web surface discovered -- nothing to hunt. "
+              "(Web flag capture is the capability shipped today; see docs/THM_RUNBOOK.md.)")
+        print(f"    recon evidence: {recon_out.resolve()}")
+        return 0
+
+    # --- 2) EXPLOIT SCOPE (in-process; carries the operator's attestation) ---
+    flag = FlagDefinition(
+        kind="pattern",
+        description=f"Any platform flag token returned by an authorized web surface on {args.target}",
+        target_ref="a response body on an in-scope web surface",
+        expected=args.flag_pattern)
+    xscope = ExploitScope(
+        scope_id=f"engage-exploit-{stamp}", owner=args.target, authorised_by=args.operator,
+        surfaces=tuple(s.id for s in web_surfaces), flag=flag,
+        valid_from=valid_from, valid_until=valid_until, attestation=args.attestation,
+        owner_attested=True, environment=args.env, allow_production=args.allow_production,
+        engagement_type="pentest", max_steps=args.max_steps, max_seconds=args.max_seconds)
+
+    registry = ExploitModuleRegistry()
+    registry.register(WebFlagHuntModule())
+    registry.register(HTTPFlagReadModule())
+
+    exploit_out = root / "runs" / f"{stamp}-engage-exploit"
+    summary = ExploitController(xscope, exploit_out, registry, surfaces=web_surfaces,
+                                established_facts=facts, provider=None,
+                                cancel_file=root / "STOP", verbose=verbose).run()
+
+    # --- 3) REPORT ------------------------------------------------------------
+    captured = summary["flag"]["captured"]
+    print()
+    if captured:
+        fv = next((f.get("flag_value") for f in summary.get("findings", []) if f.get("flag_value")), "")
+        rate = summary["flag"]["rate"]
+        print(f"RED-AI: FLAG CAPTURED on {args.target}  ->  {fv or '(file read)'}")
+        print(f"    reproduced: {rate:.0%}  ·  steps: {summary['steps']}")
+    else:
+        print(f"RED-AI: no flag captured ({summary['outcome']}). "
+              f"Not broken in {summary['steps']} step(s) -- this is signal, not 'secure'.")
+    print(f"    recon evidence:   {recon_out.resolve()}")
+    print(f"    exploit evidence: {exploit_out.resolve()}")
+    print(f"    verify:  python -m red_ai verify {exploit_out}")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="red_ai", description="RED-AI — offline, evidence-first AI security testing")
     p.add_argument("--data-dir", type=Path, default=Path("data"))
@@ -212,6 +313,19 @@ def main(argv=None) -> int:
     eng.add_argument("--scope", type=Path, required=True)
     eng.add_argument("--level", choices=LEVELS, default="naive")
     eng.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
+    en = sub.add_parser("engage", help="live network engagement: recon -> exploit -> capture the flag (authorized)")
+    en.add_argument("--target", required=True, help="host or IP of the authorized target (e.g. a THM/HTB box)")
+    en.add_argument("--ports", default="80,8080,8000,8888,443", help="ports to recon (default common web ports)")
+    en.add_argument("--flag-pattern", default=r"(?:THM|FLAG|HTB|flag)\{[^}]{1,128}\}|\b[0-9a-f]{32}\b",
+                    help="regex describing the flag FORM to capture (default: THM/HTB/flag{...} or a 32-hex)")
+    en.add_argument("--env", choices=["owned", "authorized_lab", "production"], default="authorized_lab")
+    en.add_argument("--attestation", default="Authorized lab/CTF engagement (operator-attested).",
+                    help="authorization statement recorded in the evidence")
+    en.add_argument("--allow-production", action="store_true", help="required to engage a production target")
+    en.add_argument("--max-steps", type=int, default=120)
+    en.add_argument("--max-seconds", type=int, default=600)
+    en.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
+    en.add_argument("--quiet", action="store_true", help="suppress the live progress stream")
     op = sub.add_parser("operator", help="manage operator identities (keys)")
     op.add_argument("op_action", choices=["add", "list"]); op.add_argument("op_id", nargs="?")
     sub.add_parser("doctor")
@@ -289,6 +403,8 @@ def main(argv=None) -> int:
             scope = verify_scope(json.loads(args.scope.read_text(encoding="utf-8")), keyring.key(args.operator))
             authorize_invocation(scope, args.operator, keyring)
             execute_engine(scope, root, args.level)
+        elif args.command == "engage":
+            return cmd_engage(root, args)
         elif args.command == "operator":
             keyring = Keyring(root)
             if args.op_action == "add":

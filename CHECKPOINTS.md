@@ -44,19 +44,32 @@ connects to one authorized easy TryHackMe/HTB box, enumerates its real services,
 and (target permitting) captures the declared flag — producing the evidence
 bundle (`events.jsonl` + `verify` + report).
 
-**Acceptance criterion:** a real run, on the VPN, that the Claude bridge VM
-cannot perform — only the operator can close this, because the lab network is
-reachable only from their machine. This is the checkpoint that converts
-"built and lab-proven" into "works in the wild."
+**Acceptance criterion:** a real run, on the VPN, that no cloud sandbox can
+perform — only the operator can close this, because the lab network is reachable
+only from their machine. This is the checkpoint that converts "built and
+lab-proven" into "works in the wild."
 
-**Minimum to attempt:**
+**Capability status — READY, awaiting the live run.** The discovery-driven
+capture path that CP2 needs is now built and proven over **real sockets** (not
+mocks) against deliberately-vulnerable local servers:
+- a one-command `engage` flow: recon → recon→exploit bridge → gated flag hunt,
+  with a live timestamped progress stream;
+- a `pattern` flag kind that captures the flag **form** (`THM{…}`/`flag{…}`/
+  `HTB{…}`/32-hex) with no pre-declared path — zero-false-positive, reproduced;
+- proven discovery-driven: with the flag behind a **custom `robots.txt`-disclosed
+  dir not in any wordlist**, RED-AI followed the breadcrumb and captured
+  `THM{r3con_t0_expl01t_br1dge}` in 3 steps, reproduction 1.0, evidence verified;
+- 164 offline tests (was 157), incl. the module, the matcher, and the bridge.
+
+**To close it (operator, on VPN):**
 ```
-python -m red_ai.recon init --host <box-ip> --ports 1-1000 \
-    --attest "THM authorized lab" --env authorized_lab --identify --web
-python -m red_ai.recon scan --scope data/recon/<id>.scope.json --verbose
+python -m red_ai operator add <you>
+python -m red_ai engage --target <box-ip> --ports 80,8080,8000,8888,443 --operator <you>
+python -m red_ai verify data/runs/<ts>-engage-exploit
 ```
-(Exploit/flag capture on a real box follows once a surface + a declared flag are
-in scope.)
+See **[docs/THM_RUNBOOK.md](docs/THM_RUNBOOK.md)** for the full procedure, box
+selection, and the honest scope of what captures today (web boxes) vs. what does
+not yet (SSH brute / SQLi / RCE / privesc).
 
 ---
 
