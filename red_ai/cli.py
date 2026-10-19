@@ -226,6 +226,9 @@ def cmd_engage(root: Path, args) -> int:
         return 1
 
     stamp = now().strftime("%Y%m%dT%H%M%S")
+    # Unique run tag so concurrent engagements in one data dir never collide on the
+    # run-dir name (timestamp alone is per-second). Sortable + unique.
+    run_tag = f"{stamp}-{secrets.token_hex(2)}"
     valid_from = (now() - timedelta(minutes=1)).isoformat()
     valid_until = (now() + timedelta(hours=2)).isoformat()
 
@@ -236,7 +239,7 @@ def cmd_engage(root: Path, args) -> int:
         owner_attested=True, environment=args.env, allow_production=args.allow_production,
         identify_services=True, enumerate_web=True,
         valid_from=valid_from, valid_until=valid_until)
-    recon_out = root / "runs" / f"{stamp}-engage-recon"
+    recon_out = root / "runs" / f"{run_tag}-engage-recon"
     if verbose:
         print(f"[{now().strftime('%H:%M:%S')}] [engage] target={args.target} ports={args.ports} "
               f"env={args.env} operator={args.operator}", flush=True)
@@ -276,7 +279,7 @@ def cmd_engage(root: Path, args) -> int:
     registry.register(CommandInjectionModule())
     registry.register(HTTPFlagReadModule())
 
-    exploit_out = root / "runs" / f"{stamp}-engage-exploit"
+    exploit_out = root / "runs" / f"{run_tag}-engage-exploit"
     summary = ExploitController(xscope, exploit_out, registry, surfaces=web_surfaces,
                                 established_facts=facts, provider=None,
                                 cancel_file=root / "STOP", verbose=verbose).run()
