@@ -99,9 +99,14 @@ class TestGapAnalysis(unittest.TestCase):
                              "captured": False, "web_surfaces": 1, "summary": {"outcome": "no_breach"}})
         self.assertTrue(any("form-login" in g["missing"] for g in gaps))
 
-    def test_no_web_surface_gap(self):
+    def test_no_open_ports_flags_reachability(self):
         gaps = gap_analysis({"recon_summary": {"open": []}, "facts": [],
                              "captured": False, "status": "no_web_surface", "summary": {}})
+        self.assertTrue(any(g["checkpoint"] == "connectivity" for g in gaps))
+
+    def test_open_but_nonweb_surface_gap(self):
+        gaps = gap_analysis({"recon_summary": {"open": [{"port": 22, "service": "ssh"}]},
+                             "facts": [], "captured": False, "status": "no_web_surface", "summary": {}})
         self.assertTrue(any("no web surface" in g["lead"].lower() for g in gaps))
 
 

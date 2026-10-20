@@ -107,6 +107,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <div class="fld"><label>Flag pattern (regex)</label><input id="flagpat" type="text" placeholder="default: THM/HTB/flag{…} or 32-hex"></div>
   <div class="fld"><label>Operator</label><input id="operator" type="text" value="local" style="width:90px"></div>
   <label class="chk"><input id="auth" type="checkbox"> I'm authorized</label>
+  <label class="chk" title="Find ALL vulnerabilities instead of stopping at the first flag"><input id="auditmode" type="checkbox"> Audit (find all)</label>
   <button id="go">Engage</button>
   <button id="stop" disabled>Abort</button>
 </div>
@@ -267,7 +268,15 @@ function handle(rec){
 // ---- done ----
 function done(result,gaps){stopPoll();$("go").disabled=false;$("stop").disabled=true;
   const b=$("banner");
-  if(result&&result.captured){b.className="banner flag";b.innerHTML=`FLAG CAPTURED → <code>${result.flag_value||'(file read)'}</code> · reproduced ${Math.round((result.rate||0)*100)}% · ${result.steps} steps`;
+  if(result&&result.captured){b.className="banner flag";
+    const vl=result.vulns||[];
+    if(result.audit_mode&&vl.length){
+      b.innerHTML=`<b>${vl.length} VULNERABILIT${vl.length>1?'IES':'Y'} CONFIRMED</b> · ${result.steps} steps`+
+        '<div style="margin-top:6px;font-weight:400;font-size:12.5px;font-family:ui-monospace,monospace">'+
+        vl.map(v=>`• ${(v.technique||'').replace(/_/g,' ')}${v.path?' @ '+v.path:''} → ${v.flag_value||'(read)'}`).join('<br>')+'</div>';
+    } else {
+      b.innerHTML=`FLAG CAPTURED → <code>${result.flag_value||'(file read)'}</code> · reproduced ${Math.round((result.rate||0)*100)}% · ${result.steps} steps`;
+    }
     document.querySelectorAll('.stage').forEach(el=>el.classList.add('on','done'));}
   else if(result){b.className="banner warn";b.innerHTML=`No flag captured (${result.outcome}). Not broken in ${result.steps} step(s) — signal, not "secure".`;}
   if(gaps&&gaps.length){$("gapsempty").style.display="none";$("gaps").className="gaps show";
@@ -300,7 +309,7 @@ $("go").onclick=()=>{const target=$("target").value.trim();
   reset();curTarget=target;$("go").disabled=true;$("stop").disabled=false;
   const params={target,objective:$("objective").value.trim(),ports:$("ports").value.trim()||"1-1000",
     operator:$("operator").value.trim()||"local",flag_pattern:$("flagpat").value.trim()||null,
-    enabled_modules:enabledMods(),authorized:true};
+    enabled_modules:enabledMods(),audit:$("auditmode").checked,authorized:true};
   if(ws&&ws.readyState===1){params.action="engage";ws.send(JSON.stringify(params));}
   else{fetch("/api/engage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(params)})
     .then(r=>r.json()).then(j=>{if(j.error){done({captured:false,outcome:j.error,steps:0},[]);return;}runId=j.run_id;startPoll(j.run_id);});}};

@@ -124,7 +124,8 @@ class _Handler(BaseHTTPRequestHandler):
             _HUB.unregister(conn)
 
 
-def serve(host: str = "127.0.0.1", port: int = 8787, data_dir="data") -> None:
+def serve(host: str = "127.0.0.1", port: int = 8787, data_dir="data",
+          open_browser: bool = False) -> None:
     global _HUB
     root = Path(data_dir).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -136,10 +137,15 @@ def serve(host: str = "127.0.0.1", port: int = 8787, data_dir="data") -> None:
     _HUB = Hub(root)
     httpd = ThreadingHTTPServer((host, port), _Handler)
     where = "localhost only" if host in ("127.0.0.1", "localhost") else host
-    print(f"RED-AI dashboard on http://{host}:{port}  ({where}) · data: {root}")
+    url = f"http://{'127.0.0.1' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}"
+    print(f"RED-AI dashboard on {url}  ({where}) · data: {root}")
     if host not in ("127.0.0.1", "localhost"):
         print("  WARNING: bound to a non-localhost address — this console can drive attacks; "
               "do not expose it on the VPN/LAN.")
+    if open_browser:
+        import threading
+        import webbrowser
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

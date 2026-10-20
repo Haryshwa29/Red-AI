@@ -65,7 +65,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
                 allow_production=False, max_steps=400, max_seconds=900,
                 operator=DEFAULT_OPERATOR, enabled_modules=(), objective="",
-                on_event=None, verbose=False) -> dict:
+                audit=False, on_event=None, verbose=False) -> dict:
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
     root = Path(root)
     flag_pattern = flag_pattern or DEFAULT_FLAG_PATTERN   # None/empty -> default
@@ -150,7 +150,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     summary = ExploitController(xscope, exploit_out, build_registry(), surfaces=web_surfaces,
                                 established_facts=facts, provider=None,
                                 cancel_file=root / "STOP", verbose=verbose,
-                                on_event=phased("exploit")).run()
+                                on_event=phased("exploit"), stop_on_capture=not audit).run()
 
     captured = summary["flag"]["captured"]
     fv = next((f.get("flag_value") for f in summary.get("findings", []) if f.get("flag_value")), "")

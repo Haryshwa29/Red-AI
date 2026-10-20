@@ -45,11 +45,17 @@ COMMON_PATHS = [
 ]
 
 
+def _ssl_ctx_for(url: str):
+    import ssl
+    # self-signed lab/device certs are the norm; we are assessing, not trusting
+    return ssl._create_unverified_context() if url.lower().startswith("https") else None
+
+
 def _urllib_opener(url: str, timeout_s: float):
     req = urllib.request.Request(url, method="GET",
                                  headers={"User-Agent": "RED-AI-recon/1.0", "Accept": "*/*"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as r:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=timeout_s, context=_ssl_ctx_for(url)) as r:  # noqa: S310
             return getattr(r, "status", 200) or 200, dict(r.headers), r.read(65536)
     except urllib.error.HTTPError as e:
         try:
@@ -160,15 +166,21 @@ def enumerate_web(host: str, port: int, scheme: str = "http",
                   opener: Optional[WebOpener] = None, timeout_ms: int = 4000) -> dict:
     """Read-only web surface map for one host:port. Never raises."""
     opener = opener or _urllib_opener
-    base = f"{scheme}://{host}:{port}"
     timeout_s = timeout_ms / 1000.0
 
+    # Scheme auto-detect: try the given scheme; if nothing answers (and we were on
+    # http), retry https — so a device/app serving HTTPS on any port is still found.
+    base = f"{scheme}://{host}:{port}"
     status, headers, body = _get(base, "/", opener, timeout_s)
+    if status == 0 and scheme == "http":
+        scheme = "https"
+        base = f"{scheme}://{host}:{port}"
+        status, headers, body = _get(base, "/", opener, timeout_s)
     title = None
     m = _TITLE.search(body or b"")
     if m:
         title = m.group(1).decode("utf-8", "replace").strip()[:120]
-    root = {"status": status, "server": headers.get("Server"), "title": title}
+    root = {"status": status, "server": headers.get("Server"), "title": title, "scheme": scheme}
     linked = _extract_links(body, host) if status else []   # same-origin homepage links
     params = _extract_params(body, host) if status else []  # parameterized endpoints
 

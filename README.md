@@ -42,7 +42,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (221 tests)
+python -m unittest discover -s tests -v # offline test suite (228 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 python -m red_ai crypto --samples s.txt # crypto-misuse audit: recover plaintext from weak samples
 ```
@@ -66,17 +66,26 @@ Full procedure, box selection, and the honest scope of what captures today
 
 ### Operations dashboard (watch the process, find where to improve)
 
-Run the local dashboard on the same (VPN-connected) machine to drive engagements
-and watch RED-AI *decide*: a realtime attack feed, the surface map recon builds,
-per-module coverage counters, the authorization gate's denials, and — when a run
-falls short — a **"where to improve"** list mapping what it found to the missing
-capability. Realtime over a stdlib WebSocket (zero dependencies), localhost-only.
+Run the local dashboard to drive engagements and watch RED-AI *decide*: an
+**objective** field, a realtime **attack feed**, an **operations log** of the
+literal requests it sends, the **surface map** recon builds, per-module
+**coverage** counters, the authorization gate's denials, a **Crypto Audit** tab
+(recover plaintext from weak samples), and — when a run falls short — a **"where
+to improve"** list. Realtime over a stdlib WebSocket (zero dependencies),
+localhost-only.
+
+**Double-click to launch:** `RED-AI-Dashboard.command` (macOS) / `.sh` (Linux) /
+`.bat` (Windows) — or `python -m red_ai web --open`.
+
+Tick **Audit (find all)** to enumerate *every* reachable vulnerability instead of
+stopping at the first flag — the assessment use case (e.g. a wired lab device).
+See [`docs/WEB_UI.md`](docs/WEB_UI.md) and [`docs/IPAD_LAB.md`](docs/IPAD_LAB.md),
+and try it with no target:
 
 ```bash
-python -m red_ai web            # → http://127.0.0.1:8787 (localhost only)
+python -m redai_range.showcase 8080   # a 7-vulnerability showcase app
+python -m red_ai engage --target 127.0.0.1 --ports 8080 --operator me --audit
 ```
-
-See [`docs/WEB_UI.md`](docs/WEB_UI.md).
 
 Single run against one simulation level:
 

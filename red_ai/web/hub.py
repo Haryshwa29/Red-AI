@@ -81,12 +81,18 @@ class Hub:
                 operator=params.get("operator", "local"),
                 enabled_modules=tuple(params.get("enabled_modules") or ()),
                 objective=params.get("objective", ""),
+                audit=bool(params.get("audit")),
                 on_event=on_event)
             gaps = gap_analysis(res)
+            xsum = res.get("summary") or {}
+            vulns = [{"technique": f.get("technique"), "path": f.get("path"),
+                      "flag_value": f.get("flag_value")} for f in (xsum.get("findings") or [])]
             summary = {"status": res["status"], "captured": res["captured"],
                        "flag_value": res["flag_value"], "outcome": res["outcome"],
                        "steps": res["steps"], "rate": res["rate"],
                        "web_surfaces": res["web_surfaces"],
+                       "audit_mode": xsum.get("audit_mode", False),
+                       "vulnerabilities": xsum.get("vulnerabilities", 0), "vulns": vulns,
                        "recon_out": res["recon_out"], "exploit_out": res["exploit_out"]}
             with run["lock"]:
                 run["result"] = summary

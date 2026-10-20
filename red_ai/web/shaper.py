@@ -131,11 +131,20 @@ def gap_analysis(result: dict) -> list:
             "missing": "post-exploitation — recovered-credential login, shell, privilege escalation",
             "checkpoint": "CP3 — foothold + privesc"})
 
-    # 5) no web surface at all
+    # 5) no web surface at all — distinguish "unreachable" from "open but non-web"
     if result.get("status") == "no_web_surface":
-        gaps.append({
-            "lead": "No web surface on the scanned ports",
-            "missing": "web flag capture is the shipped capability; widen --ports or build non-web modules",
-            "checkpoint": "CP3 — non-web services"})
+        open_ports = recon.get("open", []) or []
+        if not open_ports:
+            gaps.append({
+                "lead": "No open ports found — the target may be unreachable",
+                "missing": "check the IP is correct, the device is powered/wired on the same network, "
+                           "no firewall is blocking, and widen the port range",
+                "checkpoint": "connectivity"})
+        else:
+            gaps.append({
+                "lead": f"{len(open_ports)} port(s) open, but no web surface",
+                "missing": "web flag capture is the shipped capability; the open service is non-web "
+                           "(SSH/FTP/DB/…) — build a non-web module, or it may be HTTPS on an odd port",
+                "checkpoint": "CP3 — non-web services"})
 
     return gaps

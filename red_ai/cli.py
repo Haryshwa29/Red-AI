@@ -212,7 +212,7 @@ def cmd_engage(root: Path, args) -> int:
                           flag_pattern=args.flag_pattern, env=args.env,
                           attestation=args.attestation, allow_production=args.allow_production,
                           max_steps=args.max_steps, max_seconds=args.max_seconds,
-                          operator=args.operator, verbose=verbose)
+                          operator=args.operator, audit=args.audit, verbose=verbose)
     except EngageError as e:
         print(f"RED-AI: {e}", file=sys.stderr)
         return 1
@@ -224,7 +224,14 @@ def cmd_engage(root: Path, args) -> int:
         return 0
 
     print()
-    if res["captured"]:
+    xsum = res.get("summary") or {}
+    if res["captured"] and args.audit:
+        vulns = xsum.get("findings") or []
+        print(f"RED-AI: {len(vulns)} VULNERABILITIES CONFIRMED on {args.target} (audit mode)")
+        for f in vulns:
+            print(f"    • {str(f.get('technique','')).replace('_',' '):18} "
+                  f"{f.get('path',''):22} -> {f.get('flag_value') or '(read)'}")
+    elif res["captured"]:
         print(f"RED-AI: FLAG CAPTURED on {args.target}  ->  {res['flag_value'] or '(file read)'}")
         print(f"    reproduced: {res['rate']:.0%}  ·  steps: {res['steps']}")
     else:
@@ -291,6 +298,7 @@ def main(argv=None) -> int:
     en.add_argument("--allow-production", action="store_true", help="required to engage a production target")
     en.add_argument("--max-steps", type=int, default=400)
     en.add_argument("--max-seconds", type=int, default=900)
+    en.add_argument("--audit", action="store_true", help="find ALL vulnerabilities (don't stop at the first flag)")
     en.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
     en.add_argument("--quiet", action="store_true", help="suppress the live progress stream")
     cr = sub.add_parser("crypto", help="crypto-misuse audit: recover plaintext from weak sample ciphertexts")
@@ -298,9 +306,11 @@ def main(argv=None) -> int:
     cr.add_argument("--rsa-n", help="RSA modulus (dec or 0x-hex) for a weak-RSA check")
     cr.add_argument("--rsa-e", help="RSA public exponent")
     cr.add_argument("--rsa-c", help="RSA ciphertext integer")
-    web = sub.add_parser("web", help="launch the local web console (watch an engagement live)")
+    web = sub.add_parser("web", help="launch the local dashboard (opens in your browser)")
     web.add_argument("--host", default="127.0.0.1", help="bind address (default localhost; keep it local)")
     web.add_argument("--port", type=int, default=8787)
+    web.add_argument("--no-open", action="store_true", help="do not auto-open the browser")
+    web.add_argument("--open", action="store_true", help="(default) open the dashboard in your browser")
     op = sub.add_parser("operator", help="manage operator identities (keys)")
     op.add_argument("op_action", choices=["add", "list"]); op.add_argument("op_id", nargs="?")
     sub.add_parser("doctor")
@@ -382,7 +392,7 @@ def main(argv=None) -> int:
             return cmd_engage(root, args)
         elif args.command == "web":
             from red_ai.web.server import serve
-            serve(host=args.host, port=args.port, data_dir=root)
+            serve(host=args.host, port=args.port, data_dir=root, open_browser=not args.no_open)
         elif args.command == "crypto":
             return cmd_crypto(args)
         elif args.command == "operator":
