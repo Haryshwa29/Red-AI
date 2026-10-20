@@ -104,7 +104,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
         scope_id=f"engage-recon-{stamp}", owner=target, authorised_by=operator,
         hosts=target, ports=ports, attestation=attestation,
         owner_attested=True, environment=env, allow_production=allow_production,
-        identify_services=True, enumerate_web=True,
+        identify_services=True, enumerate_web=True, assess_tls=True,
         valid_from=valid_from, valid_until=valid_until)
     recon_out = root / "runs" / f"{run_tag}-engage-recon"
     recon_summary = ReconController(recon_scope, recon_out, cancel_file=root / "STOP",

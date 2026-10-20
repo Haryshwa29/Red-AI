@@ -154,6 +154,20 @@ class ReconController:
                               f"sev={wf['severity']} - {wf['meaning']}", flush=True)
                     for wl in web["leads"]:
                         print(f"[{now().strftime('%H:%M:%S')}] [recon]     LEAD    {wl['path']} ({wl['status']}) - {wl['meaning']}", flush=True)
+            if self.scope.assess_tls:
+                from red_ai.recon.tls import assess_tls
+                tls = assess_tls(r.host, r.port, timeout_ms=self.scope.timeout_ms * 5)
+                if tls["is_tls"]:
+                    finding["tls"] = tls
+                    journal.append("tls_posture", {"host": r.host, "port": r.port,
+                                                   "accepted": [k for k, v in tls["protocols"].items()
+                                                                if v["status"] == "accepted"],
+                                                   "cert": tls["cert"], "findings": tls["findings"],
+                                                   "reproduction": tls["reproduction"]})
+                    if self.verbose:
+                        for tf in tls["findings"]:
+                            print(f"[{now().strftime('%H:%M:%S')}] [recon]     TLS {tf['severity'].upper()} "
+                                  f"{r.host}:{r.port} {tf['title']}", flush=True)
             findings.append(finding)
             journal.append("finding", finding)
             if self.verbose:

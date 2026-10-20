@@ -62,6 +62,7 @@ class ReconScope:
     replays: int = 1                # re-probe open ports to report a stable result
     identify_services: bool = False  # opt-in active-safe service/version ID (banner.py)
     enumerate_web: bool = False      # opt-in read-only web surface enumeration (web.py)
+    assess_tls: bool = False         # opt-in TLS/crypto posture assessment (tls.py)
 
     @classmethod
     def build(cls, *, ports: str, hosts, **kw) -> "ReconScope":

@@ -52,6 +52,10 @@ def shape_event(ev: dict) -> dict:
                 "params": [f"{e.get('path')}?{e.get('param')}" for e in (p.get("params") or [])],
                 "findings": [{"path": f.get("path"), "severity": f.get("severity")}
                              for f in (p.get("web_findings") or [])]}
+    elif kind == "tls_posture":
+        data = {"port": p.get("port"), "accepted": p.get("accepted") or [],
+                "findings": [{"title": f.get("title"), "severity": f.get("severity")}
+                             for f in (p.get("findings") or [])]}
     elif kind == "routing":
         data = {"modules": p.get("candidate_modules") or []}
     elif kind == "gate":

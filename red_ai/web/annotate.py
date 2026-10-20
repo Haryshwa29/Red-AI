@@ -81,6 +81,15 @@ def annotate(ev: dict) -> "dict | None":
         if kind == "finding":
             svc = p.get("service_detected") or p.get("service") or "unknown"
             return _line("recon", "info", f"Port {p.get('port')}: {svc}.")
+        if kind == "tls_posture":
+            tf = p.get("findings") or []
+            if not tf:
+                return _line("enumerate", "good", f"TLS on {p.get('port')}: no weak posture found.")
+            worst = tf[0]
+            return _line("enumerate", "finding",
+                         f"TLS weakness on {p.get('port')}: {worst.get('title')} "
+                         f"(+{len(tf)-1} more)" if len(tf) > 1 else
+                         f"TLS weakness on {p.get('port')}: {worst.get('title')}")
         return None  # reproduction, run_finished, etc.
 
     # --- exploit phase ---------------------------------------------------

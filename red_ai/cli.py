@@ -236,6 +236,30 @@ def cmd_engage(root: Path, args) -> int:
     return 0
 
 
+def cmd_crypto(args) -> int:
+    """Audit authorized ciphertext samples for crypto misuse and recover plaintext
+    as hard proof. Runs offline; proves weakness on the client's own data."""
+    from red_ai.crypto.analyze import analyze_samples
+    lines = [ln for ln in args.samples.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    rsa = None
+    if args.rsa_n and args.rsa_e and args.rsa_c:
+        rsa = {"n": args.rsa_n, "e": args.rsa_e, "c": args.rsa_c}
+    rep = analyze_samples(lines, rsa=rsa)
+    print(f"RED-AI crypto audit — {rep['samples']} sample(s)")
+    print(f"  VERDICT: {rep['verdict']}\n")
+    if not rep["findings"]:
+        print("  No weakness demonstrated. (Absence of a break is NOT a proof of safety.)")
+        return 0
+    for f in rep["findings"]:
+        print(f"  [{f['severity'].upper():8}] {f['class']} — {f['method']}")
+        if f.get("recovered"):
+            print(f"     RECOVERED PLAINTEXT (proof): {f['recovered']!r}")
+        print(f"     evidence   : {f['evidence']}")
+        print(f"     remediation: {f['remediation']}")
+        print(f"     reference  : {f['reference']}  (the why — not the proof)\n")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="red_ai", description="RED-AI — offline, evidence-first AI security testing")
     p.add_argument("--data-dir", type=Path, default=Path("data"))
@@ -269,6 +293,11 @@ def main(argv=None) -> int:
     en.add_argument("--max-seconds", type=int, default=900)
     en.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
     en.add_argument("--quiet", action="store_true", help="suppress the live progress stream")
+    cr = sub.add_parser("crypto", help="crypto-misuse audit: recover plaintext from weak sample ciphertexts")
+    cr.add_argument("--samples", type=Path, required=True, help="file with one ciphertext sample per line (hex/base64/raw)")
+    cr.add_argument("--rsa-n", help="RSA modulus (dec or 0x-hex) for a weak-RSA check")
+    cr.add_argument("--rsa-e", help="RSA public exponent")
+    cr.add_argument("--rsa-c", help="RSA ciphertext integer")
     web = sub.add_parser("web", help="launch the local web console (watch an engagement live)")
     web.add_argument("--host", default="127.0.0.1", help="bind address (default localhost; keep it local)")
     web.add_argument("--port", type=int, default=8787)
@@ -354,6 +383,8 @@ def main(argv=None) -> int:
         elif args.command == "web":
             from red_ai.web.server import serve
             serve(host=args.host, port=args.port, data_dir=root)
+        elif args.command == "crypto":
+            return cmd_crypto(args)
         elif args.command == "operator":
             keyring = Keyring(root)
             if args.op_action == "add":
