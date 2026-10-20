@@ -30,9 +30,10 @@ def annotate(ev: dict) -> "dict | None":
 
     # --- engage-level phase markers (synthetic) --------------------------
     if kind == "engage_started":
+        obj = f" · objective: {p.get('objective')}" if p.get("objective") else ""
         return _line("authorize", "good",
                      f"Authorized — starting engagement on {p.get('target')} "
-                     f"(ports {p.get('ports')}), operator '{p.get('operator')}'.")
+                     f"(ports {p.get('ports')}), operator '{p.get('operator')}'{obj}.")
     if kind == "recon_done":
         return _line("enumerate", "info",
                      f"Recon complete: {p.get('web_surfaces', 0)} web surface(s) found, "

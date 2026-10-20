@@ -11,12 +11,20 @@ the VPN); the browser is only the window.
 
 ![dashboard](dashboard.png)
 
-## Running it
+## Running it on your PC
 
 ```bash
+git clone https://github.com/Haryshwa29/Red-AI.git   # once
 cd Red-AI
-python -m red_ai web            # → http://127.0.0.1:8787
+python -m red_ai web            # → open http://127.0.0.1:8787
 ```
+
+No installs — pure Python standard library. It runs on the machine that can reach
+the target (on the VPN for a lab box). The dashboard has **two tabs**:
+
+- **Live Engagement** — drive an engagement against a target and watch it work.
+- **Crypto Audit** — paste ciphertext samples and recover plaintext as proof of
+  weak encryption (offline; see [`CRYPTO.md`](CRYPTO.md)).
 
 Enter the target IP, tick **I'm authorized**, press **Engage**. Streaming is over
 WebSocket (status shown top-right); if the WebSocket can't open it falls back to
@@ -25,6 +33,14 @@ warning if you bind anywhere but localhost.
 
 ## What each panel tells you
 
+- **Objective / goal** — a free-text field for the engagement's intent. It is
+  recorded in the signed attestation (and the evidence) so a run's purpose is
+  auditable, and it shows at the top of the feed. It is context, not an autonomous
+  planner — the pipeline stays deterministic.
+- **Operations log** — the literal commands/requests RED-AI runs, as they happen
+  (`tcp-connect host:port → open`, `GET http://host/path → outcome`,
+  `tls-handshake host:port [protocols]`). This is the "how": you watch every
+  network operation, not just the summary.
 - **Control bar** — target, ports (default `1-1000` so recon finds the web port
   itself), an optional flag-pattern regex, operator, and the authorization tick.
 - **Module toggles** — turn individual exploit modules on/off and re-run to study
@@ -46,6 +62,14 @@ warning if you bind anywhere but localhost.
   could not use* (an open SSH port, a login form, parameters it couldn't break)
   mapped to the missing capability and the checkpoint it belongs to. This turns a
   `no_breach` into a concrete next build.
+
+## Crypto Audit tab
+
+Paste ciphertext samples (one per line — hex, base64, or raw), optionally RSA
+`n`/`e`/`c`, and press **Analyze**. RED-AI runs the crypto-misuse battery offline
+and shows each finding with the **recovered plaintext** highlighted — the hard
+proof. It only recovers when the crypto is misused; correct AES-GCM / TLS 1.3
+returns "no demonstrable break" (not a proof of safety). See [`CRYPTO.md`](CRYPTO.md).
 
 ## Security (unchanged, and important)
 

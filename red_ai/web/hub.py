@@ -80,6 +80,7 @@ class Hub:
                 attestation=params["attestation"],
                 operator=params.get("operator", "local"),
                 enabled_modules=tuple(params.get("enabled_modules") or ()),
+                objective=params.get("objective", ""),
                 on_event=on_event)
             gaps = gap_analysis(res)
             summary = {"status": res["status"], "captured": res["captured"],

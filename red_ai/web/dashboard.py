@@ -71,13 +71,37 @@ DASHBOARD_HTML = r"""<!doctype html>
   .gap .c{display:inline-block;margin-top:3px;font-size:10.5px;color:var(--vi);border:1px solid var(--vi);
     border-radius:4px;padding:0 6px}
   .empty{color:var(--mu);padding:16px;text-align:center}
+  .tabs{display:flex;gap:4px;padding:8px 18px 0;border-bottom:1px solid var(--ln)}
+  .tab{padding:8px 16px;font-size:13px;font-weight:700;color:var(--mu);cursor:pointer;
+    border:1px solid transparent;border-bottom:none;border-radius:7px 7px 0 0}
+  .tab.on{color:var(--tx);background:var(--p);border-color:var(--ln)}
+  .cwrap{max-width:1100px;padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.cwrap{grid-template-columns:1fr}}
+  textarea{width:100%;min-height:200px;background:var(--p2);border:1px solid var(--ln);color:var(--tx);
+    border-radius:7px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;resize:vertical}
+  .rsa{display:flex;gap:8px;margin-top:8px} .rsa input{flex:1;min-width:0}
+  .cfind{border:1px solid var(--ln);border-radius:8px;margin:10px 12px;overflow:hidden}
+  .cfind .hd{padding:7px 10px;font-size:12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--ln)}
+  .sev{font-size:10px;font-weight:700;padding:1px 7px;border-radius:4px}
+  .sev.critical{background:#3d1416;color:#ffb0ab} .sev.high{background:#3a2a0c;color:#f0c674}
+  .sev.medium{background:#15243d;color:#9cc4ff}
+  .cfind .bd{padding:8px 10px;font-size:12.5px}
+  .recov{background:#0f2417;border:1px solid var(--gn);color:#aff0c6;border-radius:6px;padding:8px 10px;
+    margin:6px 0;font-family:ui-monospace,monospace;font-size:12.5px;word-break:break-word;white-space:pre-wrap}
+  .cfind .mu{color:var(--mu);font-size:11.5px;margin-top:3px}
 </style></head>
 <body>
 <header>
   <h1>RED-AI</h1><span class="sub">Operations Dashboard — watch the process, find where to improve</span>
   <span class="ws" id="wsind"><span class="d"></span><span id="wstxt">connecting…</span></span>
 </header>
+<div class="tabs">
+  <div class="tab on" id="tab-engage" onclick="showView('engage')">Live Engagement</div>
+  <div class="tab" id="tab-crypto" onclick="showView('crypto')">Crypto Audit</div>
+</div>
+<div id="view-engage">
 <div class="bar">
+  <div class="fld" style="flex:1 1 240px;min-width:200px"><label>Objective / goal (recorded in evidence)</label><input id="objective" type="text" placeholder="e.g. capture the web flag on this box"></div>
   <div class="fld"><label>Target</label><input id="target" type="text" placeholder="10.10.x.x"></div>
   <div class="fld"><label>Ports</label><input id="ports" type="text" value="1-1000"></div>
   <div class="fld"><label>Flag pattern (regex)</label><input id="flagpat" type="text" placeholder="default: THM/HTB/flag{…} or 32-hex"></div>
@@ -95,6 +119,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="banner" id="banner"></div>
       <h3>Attack feed <span class="k" id="feedcount">click a line for the raw event</span></h3>
       <div class="feed" id="feed"><div class="empty">Enter a target and press Engage.</div></div>
+    </div>
+    <div class="card">
+      <h3>Operations <span class="k" id="opcount">the literal commands / requests RED-AI runs</span></h3>
+      <div class="feed" id="ops" style="max-height:320px"><div class="empty">each network operation RED-AI performs appears here, as it happens</div></div>
     </div>
     <div class="card">
       <h3>Where to improve <span class="k">gaps found this run</span></h3>
@@ -123,11 +151,35 @@ DASHBOARD_HTML = r"""<!doctype html>
     </div>
   </div>
 </div>
+</div><!-- view-engage -->
+
+<div id="view-crypto" hidden>
+  <div class="cwrap">
+    <div class="card">
+      <h3>Ciphertext samples <span class="k">one per line — hex, base64, or raw</span></h3>
+      <div style="padding:10px 12px">
+        <textarea id="samples" placeholder="Paste ciphertext samples, one per line.&#10;hex / base64 / raw text all accepted."></textarea>
+        <div class="rsa">
+          <input id="rn" type="text" placeholder="RSA n (optional)">
+          <input id="re" type="text" placeholder="e">
+          <input id="rc" type="text" placeholder="c">
+        </div>
+        <button id="analyze" style="margin-top:10px;background:var(--vi)">Analyze &amp; recover plaintext</button>
+        <p class="mu" style="color:var(--mu);font-size:12px;margin:8px 0 0">Offline, on your machine. Recovers plaintext only when the crypto is misused; correct AES-GCM / TLS 1.3 will not yield — that discipline is the point.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Result <span class="k">recovered plaintext is the proof</span></h3>
+      <div class="banner" id="cbanner"></div>
+      <div id="cfindings"><div class="empty">results appear here after you analyze</div></div>
+    </div>
+  </div>
+</div>
 
 <script>
 const STAGES=[["authorize","Authorize"],["recon","Recon"],["enumerate","Enumerate"],["exploit","Exploit"],["capture","Capture"]];
 const $=id=>document.getElementById(id);
-let ws=null, runId=null, roster=[], counters={}, ports={}, services={}, paths=new Set(), params=new Set(), denies=[], pollTimer=null, since=0;
+let ws=null, runId=null, roster=[], counters={}, ports={}, services={}, paths=new Set(), params=new Set(), denies=[], pollTimer=null, since=0, curTarget="", opN=0;
 
 // ---- stages ----
 $("stages").innerHTML=STAGES.map((s,i)=>`<div class="stage" data-s="${s[0]}"><span class="d"></span><b>${i+1} ${s[1]}</b></div>`+(i<4?'<span class="ar">→</span>':'')).join("");
@@ -147,6 +199,8 @@ function reset(){counters={};ports={};services={};paths=new Set();params=new Set
   $("feed").innerHTML="";$("banner").className="banner";$("gaps").className="gaps";$("gaps").innerHTML="";
   $("gapsempty").style.display="block";$("gate").innerHTML='<div class="empty">no denials yet</div>';
   $("surface").innerHTML='<div class="empty">scanning…</div>';
+  $("ops").innerHTML='<div class="empty">each network operation RED-AI performs appears here, as it happens</div>';
+  opN=0;$("opcount").textContent="the literal commands / requests RED-AI runs";
   ["m_steps","m_surf","m_paths","m_deny"].forEach(i=>$(i).textContent="0");
   document.querySelectorAll('.stage').forEach(el=>el.classList.remove('on','done'));
   roster.forEach(m=>{$("t_"+m.id).textContent="0";$("a_"+m.id).textContent="0";$("c_"+m.id).textContent="0";});}
@@ -167,9 +221,34 @@ function renderSurface(){let h="";
   if(params.size){h+='<div style="margin-top:8px"><b class="k">Parameters</b><br>'+[...params].map(p=>`<span class="chip">${p}</span>`).join("")+'</div>';}
   $("surface").innerHTML=h||'<div class="empty">nothing yet</div>';}
 
+// ---- operations log: the literal commands / requests RED-AI runs ----
+function opLine(rec){const d=rec.data||{},t=curTarget||"target";
+  if(rec.kind==="probe"&&d.state==="open")return `tcp-connect ${t}:${d.port}   -> open (${d.latency_ms}ms)`;
+  if(rec.kind==="web_enum")return `GET  http://${t}:${d.port}/   -> HTTP ${(d.root||{}).status}`;
+  if(rec.kind==="tls_posture")return `tls-handshake ${t}:${d.port}   [${(d.accepted||[]).join(', ')}]`;
+  if(rec.kind==="step"){const extra=(d.obs&&/via/.test(d.obs))?('  « '+d.obs+' »'):'';
+    return `GET  http://${t}${d.path||''}${extra}   -> ${d.outcome}${d.flag_claimed?'  ★ FLAG':''}`;}
+  return null;}
+function addOp(rec){const line=opLine(rec);if(!line)return;const o=$("ops");const e=o.querySelector('.empty');if(e)e.remove();
+  const row=document.createElement('div');row.className='r'+(rec.data&&rec.data.flag_claimed?' lv-flag':'');
+  row.innerHTML=`<span class="tm">${rec.t||''}</span><span class="tx"></span>`;row.querySelector('.tx').textContent=line;
+  o.appendChild(row);o.scrollTop=o.scrollHeight;opN++;$("opcount").textContent=opN+" operations";}
+
+// ---- views + crypto audit ----
+function showView(v){$("view-engage").hidden=v!=='engage';$("view-crypto").hidden=v!=='crypto';
+  $("tab-engage").classList.toggle('on',v==='engage');$("tab-crypto").classList.toggle('on',v==='crypto');}
+function renderCrypto(rep){const b=$("cbanner");b.className='banner '+(rep.broke?'flag':'warn');b.textContent=rep.verdict;
+  const el=$("cfindings");
+  if(!rep.findings.length){el.innerHTML='<div class="empty">No weakness demonstrated. (Absence of a break is NOT a proof of safety.)</div>';return;}
+  el.innerHTML=rep.findings.map(f=>`<div class="cfind"><div class="hd"><span class="sev ${f.severity}">${f.severity.toUpperCase()}</span><b>${f.class}</b><span class="mu">${f.method}</span></div>
+    <div class="bd">${f.recovered?'<div class="mu">RECOVERED PLAINTEXT (proof):</div><div class="recov"></div>':''}
+    <div class="mu">${f.evidence}</div><div class="mu">fix: ${f.remediation}</div><div class="mu">ref: ${f.reference}</div></div></div>`).join("");
+  const recs=rep.findings.filter(f=>f.recovered),nodes=el.querySelectorAll('.recov');
+  recs.forEach((f,i)=>{if(nodes[i])nodes[i].textContent=f.recovered;});}
+
 // ---- route one record ----
 function handle(rec){
-  addFeed(rec);const d=rec.data||{};
+  addFeed(rec);addOp(rec);const d=rec.data||{};
   if(rec.kind==="probe"&&d.state==="open"){ports[d.port]=1;renderSurface();}
   else if(rec.kind==="finding"){ports[d.port]=1;if(d.service)services[d.port]=d.service;renderSurface();}
   else if(rec.kind==="web_enum"){(d.paths||[]).forEach(p=>paths.add(p));(d.params||[]).forEach(p=>params.add(p));
@@ -205,6 +284,7 @@ function startWS(){try{ws=new WebSocket((location.protocol==="https:"?"wss://":"
     else if(m.type==="started"){runId=m.run;}
     else if(m.type==="event"){handle(m.rec);}
     else if(m.type==="done"){done(m.result,m.gaps);}
+    else if(m.type==="crypto_result"){renderCrypto(m.report);}
     else if(m.type==="error"){done({captured:false,outcome:m.error,steps:0},[]);}};}
 function fallback(){ // load modules over HTTP if WS never came up
   if(!roster.length)fetch("/api/modules").then(r=>r.json()).then(j=>{roster=j.modules;renderMods();});
@@ -217,13 +297,22 @@ function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
 $("go").onclick=()=>{const target=$("target").value.trim();
   if(!target)return alert("Enter a target IP or host.");
   if(!$("auth").checked)return alert("Confirm you are authorized to test this target.");
-  reset();$("go").disabled=true;$("stop").disabled=false;
-  const params={target,ports:$("ports").value.trim()||"1-1000",operator:$("operator").value.trim()||"local",
-    flag_pattern:$("flagpat").value.trim()||null,enabled_modules:enabledMods(),authorized:true};
+  reset();curTarget=target;$("go").disabled=true;$("stop").disabled=false;
+  const params={target,objective:$("objective").value.trim(),ports:$("ports").value.trim()||"1-1000",
+    operator:$("operator").value.trim()||"local",flag_pattern:$("flagpat").value.trim()||null,
+    enabled_modules:enabledMods(),authorized:true};
   if(ws&&ws.readyState===1){params.action="engage";ws.send(JSON.stringify(params));}
   else{fetch("/api/engage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(params)})
     .then(r=>r.json()).then(j=>{if(j.error){done({captured:false,outcome:j.error,steps:0},[]);return;}runId=j.run_id;startPoll(j.run_id);});}};
 $("stop").onclick=()=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify({action:"abort",run:runId}));};
+$("analyze").onclick=()=>{const samples=$("samples").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(!samples.length)return alert("Paste at least one ciphertext sample.");
+  const rsa=($("rn").value.trim()&&$("re").value.trim()&&$("rc").value.trim())?
+    {n:$("rn").value.trim(),e:$("re").value.trim(),c:$("rc").value.trim()}:null;
+  $("cfindings").innerHTML='<div class="empty">analyzing…</div>';$("cbanner").className="banner";
+  if(ws&&ws.readyState===1){ws.send(JSON.stringify({action:"crypto",samples,rsa}));}
+  else{fetch("/api/crypto",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({samples,rsa})})
+    .then(r=>r.json()).then(j=>renderCrypto(j.report));}};
 
 startWS();
 // if WS didn't connect within 2s, make sure modules still load

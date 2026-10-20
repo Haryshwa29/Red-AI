@@ -12,6 +12,8 @@ checkpoint it belongs to. That is the signal for where to improve the engine.
 """
 from __future__ import annotations
 
+import re
+
 from red_ai.web.annotate import annotate
 
 # Non-web services worth calling out as "found, but no capability yet".
@@ -69,6 +71,11 @@ def shape_event(ev: dict) -> dict:
             # "discovered /x (HTTP 200)" -> /x
             rest = proves.split(" ", 1)[1]
             path = rest.split(" ", 1)[0]
+        if not path:
+            # most step observations carry the path, e.g. "HTTP 404 /secret"
+            m = re.search(r"(/\S*)", proves or obs0 or "")
+            if m:
+                path = m.group(1).rstrip(".,);")
         data = {"module": p.get("module"), "outcome": p.get("outcome"),
                 "flag_claimed": p.get("flag_claimed"), "proves": proves,
                 "obs": obs0, "path": path}

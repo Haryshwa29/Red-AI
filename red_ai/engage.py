@@ -64,11 +64,16 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 flag_pattern=DEFAULT_FLAG_PATTERN, env="authorized_lab",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
                 allow_production=False, max_steps=400, max_seconds=900,
-                operator=DEFAULT_OPERATOR, enabled_modules=(), on_event=None,
-                verbose=False) -> dict:
+                operator=DEFAULT_OPERATOR, enabled_modules=(), objective="",
+                on_event=None, verbose=False) -> dict:
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
     root = Path(root)
     flag_pattern = flag_pattern or DEFAULT_FLAG_PATTERN   # None/empty -> default
+    # The operator's stated objective is recorded in the signed attestation (and
+    # the evidence), so a run's intent is auditable. It is context, not an
+    # autonomous planner: the pipeline stays deterministic.
+    if objective:
+        attestation = f"{attestation} | objective: {objective}"
 
     # --- authorization preconditions -------------------------------------
     keyring = Keyring(root)
@@ -97,7 +102,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     valid_until = (now() + timedelta(hours=2)).isoformat()
 
     emit("engage_started", {"target": target, "ports": ports, "env": env,
-                            "operator": operator}, "engage")
+                            "operator": operator, "objective": objective}, "engage")
 
     # --- 1) RECON --------------------------------------------------------
     recon_scope = ReconScope.build(

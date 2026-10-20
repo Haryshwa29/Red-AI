@@ -65,13 +65,17 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        if u.path != "/api/engage":
+        if u.path not in ("/api/engage", "/api/crypto"):
             return self._send(404, {"error": "not found"})
         try:
             length = int(self.headers.get("Content-Length", 0))
             params = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             return self._send(400, {"error": "bad request body"})
+        if u.path == "/api/crypto":
+            from red_ai.crypto.analyze import analyze_samples
+            rep = analyze_samples(params.get("samples") or [], rsa=params.get("rsa"))
+            return self._send(200, {"report": rep})
         err = _validate(params)
         if err:
             return self._send(400, {"error": err})
@@ -110,6 +114,10 @@ class _Handler(BaseHTTPRequestHandler):
                     _HUB.start(m)
                 elif action == "abort":
                     _HUB.abort(m.get("run", ""))
+                elif action == "crypto":
+                    from red_ai.crypto.analyze import analyze_samples
+                    rep = analyze_samples(m.get("samples") or [], rsa=m.get("rsa"))
+                    conn.send(json.dumps({"type": "crypto_result", "report": rep}))
                 elif action == "ping":
                     conn.send(json.dumps({"type": "pong"}))
         finally:
