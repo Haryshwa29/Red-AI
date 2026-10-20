@@ -141,7 +141,10 @@ class ReconController:
                                             "root": web["root"],
                                             "paths": web["paths"],
                                             "web_findings": web["findings"],
-                                            "web_leads": web["leads"]})
+                                            "web_leads": web["leads"],
+                                            "disclosed": web.get("disclosed", []),
+                                            "linked": web.get("linked", []),
+                                            "params": web.get("params", [])})
                 if self.verbose:
                     rt = web["root"]
                     print(f"[{now().strftime('%H:%M:%S')}] [recon]   WEB  {r.host}:{r.port} root={rt.get('status')} "

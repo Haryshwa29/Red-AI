@@ -55,13 +55,20 @@ class EngageError(ValueError):
     """Bad engagement inputs (unknown operator, production without opt-in, ...)."""
 
 
+def module_roster() -> list:
+    """The web module set as {id, name} — for the dashboard's enable/disable toggles."""
+    return [{"id": m.id, "name": m.name} for m in build_registry().all()]
+
+
 def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 flag_pattern=DEFAULT_FLAG_PATTERN, env="authorized_lab",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
                 allow_production=False, max_steps=400, max_seconds=900,
-                operator=DEFAULT_OPERATOR, on_event=None, verbose=False) -> dict:
+                operator=DEFAULT_OPERATOR, enabled_modules=(), on_event=None,
+                verbose=False) -> dict:
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
     root = Path(root)
+    flag_pattern = flag_pattern or DEFAULT_FLAG_PATTERN   # None/empty -> default
 
     # --- authorization preconditions -------------------------------------
     keyring = Keyring(root)
@@ -130,7 +137,8 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
         surfaces=tuple(s.id for s in web_surfaces), flag=flag,
         valid_from=valid_from, valid_until=valid_until, attestation=attestation,
         owner_attested=True, environment=env, allow_production=allow_production,
-        engagement_type="pentest", max_steps=max_steps, max_seconds=max_seconds)
+        engagement_type="pentest", modules=tuple(enabled_modules),
+        max_steps=max_steps, max_seconds=max_seconds)
 
     exploit_out = root / "runs" / f"{run_tag}-engage-exploit"
     emit("exploit_started", {"surfaces": len(web_surfaces)}, "exploit")
