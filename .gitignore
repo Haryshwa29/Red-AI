@@ -14,3 +14,9 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# dashboard runtime / diagnostic artifacts
+redai-diag.log
+redai-web.log
+redai-latest.zip
+RED-AI-Diagnose.bat

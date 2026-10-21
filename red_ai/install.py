@@ -83,7 +83,9 @@ def _python_for_shortcut() -> str:
 
 def _install_windows(repo: Path) -> list[str]:
     done = []
-    bat = repo / "RED-AI-Dashboard.bat"
+    bat = repo / "launchers" / "RED-AI-Dashboard.bat"
+    if not bat.exists():  # tolerate the pre-reorg layout
+        bat = repo / "RED-AI-Dashboard.bat"
     target = str(bat) if bat.exists() else _python_for_shortcut()
     args = "" if bat.exists() else "-m red_ai web"
     appdata = os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming"))

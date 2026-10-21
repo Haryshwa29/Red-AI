@@ -75,12 +75,12 @@ to improve"** list. Realtime over a stdlib WebSocket (zero dependencies),
 localhost-only.
 
 **Install it like an app (adds it to your Start menu / Launchpad / app menu):**
-double-click `INSTALL.bat` (Windows) / `INSTALL-mac.command` (macOS) /
-`INSTALL-linux.sh` (Linux), or run `python -m red_ai install`. It detects your OS
+double-click `launchers/INSTALL.bat` (Windows) / `launchers/INSTALL-mac.command`
+(macOS) / `launchers/INSTALL-linux.sh` (Linux), or run `python -m red_ai install`. It detects your OS
 and creates a **"RED-AI Dashboard"** shortcut you can click to open the dashboard.
 
-Or launch it directly (no install): double-click `RED-AI-Dashboard.command`
-(macOS) / `.sh` (Linux) / `.bat` (Windows), or run `python -m red_ai web`.
+Or launch it directly (no install): double-click `launchers/RED-AI-Dashboard.bat`
+(Windows) / `.command` (macOS) / `.sh` (Linux), or run `python -m red_ai web`.
 
 Tick **Audit (find all)** to enumerate *every* reachable vulnerability instead of
 stopping at the first flag — the assessment use case (e.g. a wired lab device).
