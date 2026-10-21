@@ -311,6 +311,7 @@ def main(argv=None) -> int:
     web.add_argument("--port", type=int, default=8787)
     web.add_argument("--no-open", action="store_true", help="do not auto-open the browser")
     web.add_argument("--open", action="store_true", help="(default) open the dashboard in your browser")
+    sub.add_parser("install", help="create a click-to-open shortcut for your OS (Start menu / app menu)")
     op = sub.add_parser("operator", help="manage operator identities (keys)")
     op.add_argument("op_action", choices=["add", "list"]); op.add_argument("op_id", nargs="?")
     sub.add_parser("doctor")
@@ -395,6 +396,15 @@ def main(argv=None) -> int:
             serve(host=args.host, port=args.port, data_dir=root, open_browser=not args.no_open)
         elif args.command == "crypto":
             return cmd_crypto(args)
+        elif args.command == "install":
+            from red_ai.install import install_shortcut
+            res = install_shortcut()
+            osname = {"Windows": "Windows Start menu", "Darwin": "macOS Applications",
+                      "Linux": "Linux app menu"}.get(res["system"], res["system"])
+            print(f"RED-AI: installed a click-to-open launcher for {osname}:")
+            for p in res["created"]:
+                print(f"    {p}")
+            print("Click 'RED-AI Dashboard' to open the dashboard in your browser.")
         elif args.command == "operator":
             keyring = Keyring(root)
             if args.op_action == "add":

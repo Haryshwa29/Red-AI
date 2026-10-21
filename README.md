@@ -42,7 +42,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (228 tests)
+python -m unittest discover -s tests -v # offline test suite (234 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 python -m red_ai crypto --samples s.txt # crypto-misuse audit: recover plaintext from weak samples
 ```
@@ -74,8 +74,13 @@ literal requests it sends, the **surface map** recon builds, per-module
 to improve"** list. Realtime over a stdlib WebSocket (zero dependencies),
 localhost-only.
 
-**Double-click to launch:** `RED-AI-Dashboard.command` (macOS) / `.sh` (Linux) /
-`.bat` (Windows) — or `python -m red_ai web --open`.
+**Install it like an app (adds it to your Start menu / Launchpad / app menu):**
+double-click `INSTALL.bat` (Windows) / `INSTALL-mac.command` (macOS) /
+`INSTALL-linux.sh` (Linux), or run `python -m red_ai install`. It detects your OS
+and creates a **"RED-AI Dashboard"** shortcut you can click to open the dashboard.
+
+Or launch it directly (no install): double-click `RED-AI-Dashboard.command`
+(macOS) / `.sh` (Linux) / `.bat` (Windows), or run `python -m red_ai web`.
 
 Tick **Audit (find all)** to enumerate *every* reachable vulnerability instead of
 stopping at the first flag — the assessment use case (e.g. a wired lab device).
