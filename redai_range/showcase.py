@@ -107,7 +107,9 @@ class _TS(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 def main() -> int:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-    host = sys.argv[2] if len(sys.argv) > 2 else "0.0.0.0"
+    # localhost by default: this app is intentionally vulnerable and must not be
+    # exposed on a network. Pass an explicit bind address only on an isolated lab.
+    host = sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"
     print(f"Acme vulnerable showcase on http://{host}:{port}  "
           f"({len(F)} weakness classes)  — authorized lab targets only", flush=True)
     _TS((host, port), _H).serve_forever()

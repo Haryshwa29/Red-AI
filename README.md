@@ -2,6 +2,13 @@
 
 *Attack your AI before attackers do — under explicit authorization, offline.*
 
+> ⚠️ **Authorized use only.** RED-AI is for testing systems you own or have
+> explicit written permission to test. Unauthorized use against third-party
+> systems is illegal. The bundled practice targets in `redai_range/` are
+> intentionally vulnerable — run them on localhost only, never expose them.
+> See [SECURITY.md](SECURITY.md). No warranty; you are responsible for how you
+> use this.
+
 RED-AI is an authorized adversarial security-testing framework for AI
 applications. It runs an adaptive attacker against a target, proves boundary
 failures with evidence (not model chatter), measures how reliably they
