@@ -60,6 +60,44 @@ def module_roster() -> list:
     return [{"id": m.id, "name": m.name} for m in build_registry().all()]
 
 
+def normalize_target(raw: str) -> dict:
+    """Accept an IP, hostname, host:port, or full URL; return its parts.
+
+    Returns ``{host, scheme, port, path, raw}`` with ``scheme``/``port`` ``None``
+    when unspecified and ``path`` defaulting to ``"/"``. This lets an operator
+    point RED-AI at a web app by URL (``http://host/app/``) instead of a bare IP:
+    ``host`` is what recon scans, while ``scheme``/``port``/``path`` steer the web
+    surface. The host still flows through the signed scope and gate unchanged.
+    """
+    raw = (raw or "").strip()
+    if "://" in raw:
+        from urllib.parse import urlparse
+        u = urlparse(raw)
+        return {"host": u.hostname or "", "scheme": (u.scheme or "").lower() or None,
+                "port": u.port, "path": u.path or "/", "raw": raw}
+    host, port = raw, None
+    if raw.startswith("[") and "]" in raw:                 # [IPv6]:port
+        host = raw[1:raw.index("]")]
+        rest = raw[raw.index("]") + 1:]
+        if rest.startswith(":") and rest[1:].isdigit():
+            port = int(rest[1:])
+    elif raw.count(":") == 1:                              # host:port
+        h, _, p = raw.partition(":")
+        if p.isdigit():
+            host, port = h, int(p)
+    return {"host": host, "scheme": None, "port": port, "path": "/", "raw": raw}
+
+
+def _merge_port(ports: str, extra: "int | None") -> str:
+    """Prepend an explicit URL port to the recon port list (deduped)."""
+    if not extra:
+        return ports
+    have = [p.strip() for p in str(ports).split(",") if p.strip()]
+    if str(extra) not in have:
+        have.insert(0, str(extra))
+    return ",".join(have)
+
+
 def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 flag_pattern=DEFAULT_FLAG_PATTERN, env="authorized_lab",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
@@ -69,6 +107,14 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
     root = Path(root)
     flag_pattern = flag_pattern or DEFAULT_FLAG_PATTERN   # None/empty -> default
+    # Accept an IP, hostname, host:port, or full URL. The bare host is what the
+    # scanner connects to (socket resolves names); an explicit URL port is folded
+    # into the recon list so e.g. http://app:3000/ is reached without extra flags.
+    tgt = normalize_target(target)
+    host = tgt["host"] or target
+    ports = _merge_port(ports, tgt["port"])
+    if tgt["raw"] != host:
+        attestation = f"{attestation} | target: {tgt['raw']}"
     # The operator's stated objective is recorded in the signed attestation (and
     # the evidence), so a run's intent is auditable. It is context, not an
     # autonomous planner: the pipeline stays deterministic.
@@ -101,13 +147,14 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     valid_from = (now() - timedelta(minutes=1)).isoformat()
     valid_until = (now() + timedelta(hours=2)).isoformat()
 
-    emit("engage_started", {"target": target, "ports": ports, "env": env,
+    emit("engage_started", {"target": target, "host": host, "scheme": tgt["scheme"],
+                            "path": tgt["path"], "ports": ports, "env": env,
                             "operator": operator, "objective": objective}, "engage")
 
     # --- 1) RECON --------------------------------------------------------
     recon_scope = ReconScope.build(
         scope_id=f"engage-recon-{stamp}", owner=target, authorised_by=operator,
-        hosts=target, ports=ports, attestation=attestation,
+        hosts=host, ports=ports, attestation=attestation,
         owner_attested=True, environment=env, allow_production=allow_production,
         identify_services=True, enumerate_web=True, assess_tls=True,
         valid_from=valid_from, valid_until=valid_until)

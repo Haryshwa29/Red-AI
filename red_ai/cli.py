@@ -288,7 +288,7 @@ def main(argv=None) -> int:
     eng.add_argument("--level", choices=LEVELS, default="naive")
     eng.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
     en = sub.add_parser("engage", help="live network engagement: recon -> exploit -> capture the flag (authorized)")
-    en.add_argument("--target", required=True, help="host or IP of the authorized target (e.g. a THM/HTB box)")
+    en.add_argument("--target", required=True, help="authorized target: IP, hostname, host:port, or full URL (e.g. http://app.local/bWAPP/ or a THM/HTB box IP)")
     en.add_argument("--ports", default="80,8080,8000,8888,443", help="ports to recon (default common web ports)")
     en.add_argument("--flag-pattern", default=r"(?:THM|FLAG|HTB|flag)\{[^}]{1,128}\}|\b[0-9a-f]{32}\b",
                     help="regex describing the flag FORM to capture (default: THM/HTB/flag{...} or a 32-hex)")
