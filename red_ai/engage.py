@@ -20,6 +20,7 @@ from red_ai.contracts.scope import now
 from red_ai.control.identity import Keyring, DEFAULT_OPERATOR, AccessDenied
 from red_ai.recon.scope import ReconScope
 from red_ai.recon.controller import ReconController
+from red_ai.recon.firewall import assess_firewall
 from red_ai.exploit.scope import ExploitScope
 from red_ai.exploit.contracts import FlagDefinition
 from red_ai.exploit.module import ExploitModuleRegistry
@@ -56,7 +57,7 @@ def build_registry() -> ExploitModuleRegistry:
 # --- engagement modes: what the run is looking for + how it proves it --------
 _FLAG_MODULES = ("native.content_discovery", "native.web_flag_hunt", "native.http_basic_auth",
                  "native.http_flag_read", "native.lfi_read", "native.sqli_read", "native.cmd_injection")
-_EVIDENCE_MODULES = ("native.reflected_xss", "native.sqli_error")
+_EVIDENCE_MODULES = ("native.reflected_xss", "native.sqli_error", "native.http_basic_auth")
 
 #   exploit: run the exploit phase at all?   stop: stop at the first flag?   modules: allowlist
 MODES = {
@@ -199,10 +200,14 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     emit("recon_done", {"open_surfaces": len(surfaces), "web_surfaces": len(web_surfaces),
                         "facts": len(facts), "evidence": str(recon_out)}, "enumerate")
 
+    # Firewall / network-exposure posture (derived from port states; no new traffic).
+    firewall = assess_firewall(recon_summary)
+    emit("firewall_posture", firewall, "enumerate")
+
     result = {"target": target, "run_tag": run_tag, "recon_summary": recon_summary,
               "surfaces": len(surfaces), "web_surfaces": len(web_surfaces), "facts": facts,
               "recon_out": str(recon_out), "exploit_out": None, "summary": None, "mode": mode,
-              "captured": False, "flag_value": "", "outcome": "no_web_surface",
+              "firewall": firewall, "captured": False, "flag_value": "", "outcome": "no_web_surface",
               "steps": 0, "rate": None}
 
     # recon mode: stop after mapping the surface — no exploitation.

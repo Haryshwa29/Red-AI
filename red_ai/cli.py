@@ -218,6 +218,13 @@ def cmd_engage(root: Path, args) -> int:
         print(f"RED-AI: {e}", file=sys.stderr)
         return 1
 
+    fw = res.get("firewall") or {}
+    if fw:
+        print(f"RED-AI: firewall posture = {fw.get('posture','?').upper()} "
+              f"[{fw.get('severity','')}] -- {fw.get('evidence','')}")
+        for e in fw.get("exposed_sensitive", []):
+            print(f"    ⚠ exposed: {e['service']} on port {e['port']}")
+
     if res["status"] == "recon_complete":
         print(f"RED-AI: recon complete on {args.target} -- "
               f"{res['surfaces']} surface(s), {res['web_surfaces']} web. (mode=recon; no exploitation)")
