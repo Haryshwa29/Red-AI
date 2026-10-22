@@ -49,7 +49,7 @@ design is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 cd RED-AI
 python -m red_ai doctor                 # validate config/skills/signing, no scan
 python -m red_ai demo --open            # naive/guarded/hardened sims + reports
-python -m unittest discover -s tests -v # offline test suite (234 tests)
+python -m unittest discover -s tests -v # offline test suite (285 tests)
 python -m redai_range                   # capability range: where does RED-AI fail? (offline)
 python -m red_ai crypto --samples s.txt # crypto-misuse audit: recover plaintext from weak samples
 ```
@@ -175,18 +175,29 @@ gated, discovery-driven **web flag hunt** and captures the declared flag form
 (`THM{…}`/`flag{…}`/`HTB{…}`/32-hex) with a reproduced, zero-false-positive
 check — all driven by one `engage` command (see the runbook above).
 
-Web exploit coverage now clears the whole graded range (L1–L9): **content
-discovery** (directory brute force), exposed-file and discovery-driven flag
-capture, HTML-link crawling, HTTP Basic **default credentials**, and the
-**injection family** — LFI / path traversal, SQL injection, and command
-injection — each a native, gated, bounded, read-only module behind the exploit
-interface. Content discovery runs first and feeds what it finds to the rest.
+### Capability coverage
 
-Not yet: password spray (with lockout awareness) and SSH/FTP brute force,
-form-login / token auth, blind / time-based injection, second-order injection,
-file-upload bypass, multi-step chains, and privilege escalation (`user.txt` →
-`root.txt`); plus non-web services. Each is a planned, separately-gated module,
-not a silent omission. Semantic tier-3 LLM detection remains a declared gap.
+One `engage` run picks what it's after with `--mode` (recon / ctf / ctf-audit /
+vuln / pentest) and produces evidence tagged with CWE / OWASP / MITRE:
+
+| Area | What RED-AI does today |
+|------|------------------------|
+| **Recon** | TCP connect scan with port-state analysis; read-only web enumeration; TLS posture |
+| **Firewall posture** | filtered vs. closed vs. open interpretation + exposed-sensitive-service flags (no new traffic) |
+| **Service fingerprinting** | HTTP, SSH, FTP, SMTP, **Redis, Memcached, MySQL/MariaDB, VNC, Telnet**, plus **SMB** (SMBv1 → EternalBlue) and **RDP** (no-NLA → BlueKeep) via read-only negotiate probes |
+| **WAF detection** | benign-vs-malicious-looking probe + vendor signatures (Cloudflare/Akamai/Imperva/ModSecurity/F5/AWS/…) |
+| **Web vulns (flag)** | content discovery, exposed-file & discovery-driven flag capture, HTML-link crawling, HTTP Basic default credentials, LFI/path traversal, SQLi, command injection |
+| **Web vulns (evidence, no flag)** | reflected XSS, error-based / **boolean-blind / time-blind** SQLi, default credentials — proven from the response, so they work on real apps |
+| **Email-auth posture** | SPF / DKIM / DMARC spoofability (the technical anti-phishing weak-link check; pure DNS) |
+| **LLM engine** | signed scope, policy gate, hash-linked evidence, 3-tier detector ladder, reproduction measurement, reviewed-finding memory |
+
+Content discovery runs first and feeds the surface it finds to the rest.
+
+Not yet (planned, separately-gated — not silent omissions): password spray with
+lockout awareness and SSH/FTP brute force, form-login / token auth, second-order
+injection, file-upload bypass, multi-step chains, privilege escalation
+(`user.txt` → `root.txt`), and SMB/RDP exact-build version extraction. Semantic
+tier-3 LLM detection remains a declared gap.
 Progress is tracked by the offline capability range (`python -m redai_range`,
 [`docs/CAPABILITY_RANGE.md`](docs/CAPABILITY_RANGE.md)); clearing it is the floor
 of competence, not the ceiling.
