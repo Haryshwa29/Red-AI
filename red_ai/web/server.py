@@ -124,6 +124,28 @@ class _Handler(BaseHTTPRequestHandler):
             _HUB.unregister(conn)
 
 
+class _ExclusiveServer(ThreadingHTTPServer):
+    """HTTP server that refuses to share a port.
+
+    http.server sets allow_reuse_address=True, which on Windows (SO_REUSEADDR
+    semantics) lets us bind a port another process is already LISTENING on —
+    so a collision with e.g. a local Arbiter-AI/Vite dev server goes undetected
+    and that other server keeps answering. Disabling reuse makes a busy port
+    raise, so _bind falls forward to a genuinely free port.
+    """
+    allow_reuse_address = False
+
+    def server_bind(self):  # on Windows, request exclusive ownership of the port
+        import socket as _socket
+        if hasattr(_socket, "SO_EXCLUSIVEADDRUSE"):
+            try:
+                self.socket.setsockopt(_socket.SOL_SOCKET,
+                                       _socket.SO_EXCLUSIVEADDRUSE, 1)
+            except OSError:
+                pass
+        super().server_bind()
+
+
 def _bind(host: str, port: int, tries: int = 25):
     """Bind the first free port at or above `port`. Returns (httpd, actual_port).
 
@@ -134,7 +156,7 @@ def _bind(host: str, port: int, tries: int = 25):
     last: "OSError | None" = None
     for p in range(port, port + tries):
         try:
-            return ThreadingHTTPServer((host, p), _Handler), p
+            return _ExclusiveServer((host, p), _Handler), p
         except OSError as e:  # port busy / not assignable — try the next one
             last = e
     raise OSError(f"no free port in {port}..{port + tries - 1}: {last}")
