@@ -102,7 +102,14 @@ DASHBOARD_HTML = r"""<!doctype html>
 <div id="view-engage">
 <div class="bar">
   <div class="fld" style="flex:1 1 240px;min-width:200px"><label>Objective / goal (recorded in evidence)</label><input id="objective" type="text" placeholder="e.g. capture the web flag on this box"></div>
-  <div class="fld"><label>Target</label><input id="target" type="text" placeholder="10.10.x.x"></div>
+  <div class="fld"><label>Target</label><input id="target" type="text" placeholder="10.10.x.x or http://host/app/"></div>
+  <div class="fld"><label>Mode (what to look for)</label><select id="mode" title="recon: surface only · ctf: first flag · ctf-audit: all flags · vuln: evidence-based vulnerabilities (no flag) · pentest: flags + vulns">
+    <option value="ctf">ctf — capture first flag</option>
+    <option value="ctf-audit">ctf-audit — all flags</option>
+    <option value="vuln">vuln — vulnerabilities (no flag)</option>
+    <option value="pentest">pentest — flags + vulns</option>
+    <option value="recon">recon — map surface only</option>
+  </select></div>
   <div class="fld"><label>Ports</label><input id="ports" type="text" value="1-1000"></div>
   <div class="fld"><label>Flag pattern (regex)</label><input id="flagpat" type="text" placeholder="default: THM/HTB/flag{…} or 32-hex"></div>
   <div class="fld"><label>Operator</label><input id="operator" type="text" value="local" style="width:90px"></div>
@@ -309,7 +316,7 @@ $("go").onclick=()=>{const target=$("target").value.trim();
   reset();curTarget=target;$("go").disabled=true;$("stop").disabled=false;
   const params={target,objective:$("objective").value.trim(),ports:$("ports").value.trim()||"1-1000",
     operator:$("operator").value.trim()||"local",flag_pattern:$("flagpat").value.trim()||null,
-    enabled_modules:enabledMods(),audit:$("auditmode").checked,authorized:true};
+    enabled_modules:enabledMods(),audit:$("auditmode").checked,mode:$("mode").value,authorized:true};
   if(ws&&ws.readyState===1){params.action="engage";ws.send(JSON.stringify(params));}
   else{fetch("/api/engage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(params)})
     .then(r=>r.json()).then(j=>{if(j.error){done({captured:false,outcome:j.error,steps:0},[]);return;}runId=j.run_id;startPoll(j.run_id);});}};

@@ -60,6 +60,19 @@ python -m red_ai engage --target <box-ip> --ports 80,8080,8000,8888,443 --operat
 python -m red_ai verify data/runs/<ts>-engage-exploit
 ```
 
+**Engagement modes** (`--mode`, or the dashboard dropdown) pick what the run is after:
+
+| mode | looks for | proves it by | good for |
+|------|-----------|--------------|----------|
+| `recon` | attack surface | observation | inventory, scoping |
+| `ctf` *(default)* | the first flag | captured `FLAG{…}` | boot2root / CTF |
+| `ctf-audit` | every flag | captured tokens | full CTF sweep |
+| `vuln` | real vulnerabilities | **response evidence** (SQL errors, payload reflection) — no flag needed | real web apps |
+| `pentest` | flags **and** vulns | both | full engagement |
+
+`vuln`/`pentest` are evidence-based: they confirm a bug from how the app responds
+(CWE/OWASP-tagged), so they work on real targets that have no planted flag.
+
 Full procedure, box selection, and the honest scope of what captures today
 (web boxes) vs. not yet (SSH brute / SQLi / RCE / privesc) are in
 [`docs/THM_RUNBOOK.md`](docs/THM_RUNBOOK.md).

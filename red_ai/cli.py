@@ -27,6 +27,7 @@ from red_ai.onboarding.objectives import ProfileObjectiveGenerator
 from red_ai.intelligent import skills
 from red_ai.intelligent.providers import MockProvider, make_provider, ProviderError
 from red_ai.targets.simulation import SimulationAdapter, _LEVELS
+from red_ai.engage import MODES as ENGAGE_MODES, DEFAULT_MODE as ENGAGE_DEFAULT_MODE
 from red_ai.control.controller import Controller, new_run_path
 from red_ai.control.memory import CaseStore
 from red_ai.control.identity import (
@@ -212,10 +213,16 @@ def cmd_engage(root: Path, args) -> int:
                           flag_pattern=args.flag_pattern, env=args.env,
                           attestation=args.attestation, allow_production=args.allow_production,
                           max_steps=args.max_steps, max_seconds=args.max_seconds,
-                          operator=args.operator, audit=args.audit, verbose=verbose)
+                          operator=args.operator, audit=args.audit, mode=args.mode, verbose=verbose)
     except EngageError as e:
         print(f"RED-AI: {e}", file=sys.stderr)
         return 1
+
+    if res["status"] == "recon_complete":
+        print(f"RED-AI: recon complete on {args.target} -- "
+              f"{res['surfaces']} surface(s), {res['web_surfaces']} web. (mode=recon; no exploitation)")
+        print(f"    recon evidence: {Path(res['recon_out']).resolve()}")
+        return 0
 
     if res["status"] == "no_web_surface":
         print("RED-AI: no reachable web surface discovered -- nothing to hunt. "
@@ -225,6 +232,13 @@ def cmd_engage(root: Path, args) -> int:
 
     print()
     xsum = res.get("summary") or {}
+    vfs = res.get("vulnerabilities") or []
+    if vfs:   # evidence-based findings (vuln / pentest modes)
+        print(f"RED-AI: {len(vfs)} VULNERABILITY(IES) CONFIRMED on {args.target} (mode={args.mode})")
+        for v in sorted(vfs, key=lambda f: -f.get("severity_rank", 0)):
+            print(f"    • [{v.get('severity','').upper():6}] {v.get('type',''):14} "
+                  f"{v.get('param','')}@{v.get('path','')}  ({v.get('cwe','')}/{v.get('owasp','')})")
+            print(f"              {v.get('evidence','')}")
     if res["captured"] and args.audit:
         vulns = xsum.get("findings") or []
         print(f"RED-AI: {len(vulns)} VULNERABILITIES CONFIRMED on {args.target} (audit mode)")
@@ -234,7 +248,7 @@ def cmd_engage(root: Path, args) -> int:
     elif res["captured"]:
         print(f"RED-AI: FLAG CAPTURED on {args.target}  ->  {res['flag_value'] or '(file read)'}")
         print(f"    reproduced: {res['rate']:.0%}  ·  steps: {res['steps']}")
-    else:
+    elif not vfs:
         print(f"RED-AI: no flag captured ({res['outcome']}). "
               f"Not broken in {res['steps']} step(s) -- this is signal, not 'secure'.")
     print(f"    recon evidence:   {Path(res['recon_out']).resolve()}")
@@ -298,7 +312,10 @@ def main(argv=None) -> int:
     en.add_argument("--allow-production", action="store_true", help="required to engage a production target")
     en.add_argument("--max-steps", type=int, default=400)
     en.add_argument("--max-seconds", type=int, default=900)
-    en.add_argument("--audit", action="store_true", help="find ALL vulnerabilities (don't stop at the first flag)")
+    en.add_argument("--audit", action="store_true", help="(alias) upgrade a flag mode to find ALL flags")
+    en.add_argument("--mode", choices=list(ENGAGE_MODES), default=ENGAGE_DEFAULT_MODE,
+                    help="what the run is after: "
+                         + "; ".join(f"{k}={v['desc']}" for k, v in ENGAGE_MODES.items()))
     en.add_argument("--operator", default=os.environ.get("RED_AI_OPERATOR", DEFAULT_OPERATOR))
     en.add_argument("--quiet", action="store_true", help="suppress the live progress stream")
     cr = sub.add_parser("crypto", help="crypto-misuse audit: recover plaintext from weak sample ciphertexts")

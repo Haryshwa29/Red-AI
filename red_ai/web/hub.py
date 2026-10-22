@@ -82,6 +82,7 @@ class Hub:
                 enabled_modules=tuple(params.get("enabled_modules") or ()),
                 objective=params.get("objective", ""),
                 audit=bool(params.get("audit")),
+                mode=params.get("mode") or "ctf",
                 on_event=on_event)
             gaps = gap_analysis(res)
             xsum = res.get("summary") or {}

@@ -15,7 +15,8 @@ and whether RED-AI can capture it automatically today.
 ## Attack it with RED-AI
 ```
 python -m red_ai operator add me
-python -m red_ai engage --target http://127.0.0.1:5000 --operator me --audit
+python -m red_ai engage --target http://127.0.0.1:5000 --operator me --mode pentest
+# or: --mode vuln  (evidence-based, finds the XSS/SQLi without flags)
 ```
 RED-AI captures 8 flags automatically (content discovery, exposed secrets,
 robots breadcrumb, hidden dashboard, default creds, LFI, SQLi, command injection).

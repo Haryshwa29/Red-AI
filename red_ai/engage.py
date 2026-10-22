@@ -25,7 +25,7 @@ from red_ai.exploit.contracts import FlagDefinition
 from red_ai.exploit.module import ExploitModuleRegistry
 from red_ai.exploit.modules import (HTTPFlagReadModule, WebFlagHuntModule, HTTPBasicAuthModule,
                                     LFIModule, SQLiModule, CommandInjectionModule,
-                                    ContentDiscoveryModule)
+                                    ContentDiscoveryModule, ReflectedXSSDetector, ErrorSQLiDetector)
 from red_ai.exploit.controller import ExploitController
 from red_ai.exploit.bridge import surfaces_from_recon
 
@@ -48,7 +48,30 @@ def build_registry() -> ExploitModuleRegistry:
     reg.register(SQLiModule())
     reg.register(CommandInjectionModule())
     reg.register(HTTPFlagReadModule())
+    reg.register(ReflectedXSSDetector())
+    reg.register(ErrorSQLiDetector())
     return reg
+
+
+# --- engagement modes: what the run is looking for + how it proves it --------
+_FLAG_MODULES = ("native.content_discovery", "native.web_flag_hunt", "native.http_basic_auth",
+                 "native.http_flag_read", "native.lfi_read", "native.sqli_read", "native.cmd_injection")
+_EVIDENCE_MODULES = ("native.reflected_xss", "native.sqli_error")
+
+#   exploit: run the exploit phase at all?   stop: stop at the first flag?   modules: allowlist
+MODES = {
+    "recon":     {"exploit": False, "stop": True,  "modules": (),
+                  "desc": "map the attack surface only — no exploitation"},
+    "ctf":       {"exploit": True,  "stop": True,  "modules": _FLAG_MODULES,
+                  "desc": "capture the first flag (CTF/boot2root)"},
+    "ctf-audit": {"exploit": True,  "stop": False, "modules": _FLAG_MODULES,
+                  "desc": "capture every flag on the target"},
+    "vuln":      {"exploit": True,  "stop": False, "modules": _EVIDENCE_MODULES,
+                  "desc": "evidence-based vulnerability assessment (no flag needed)"},
+    "pentest":   {"exploit": True,  "stop": False, "modules": _FLAG_MODULES + _EVIDENCE_MODULES,
+                  "desc": "flags AND evidence-based vulnerabilities (full engagement)"},
+}
+DEFAULT_MODE = "ctf"
 
 
 class EngageError(ValueError):
@@ -103,7 +126,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
                 allow_production=False, max_steps=400, max_seconds=900,
                 operator=DEFAULT_OPERATOR, enabled_modules=(), objective="",
-                audit=False, on_event=None, verbose=False) -> dict:
+                audit=False, mode=DEFAULT_MODE, on_event=None, verbose=False) -> dict:
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
     root = Path(root)
     flag_pattern = flag_pattern or DEFAULT_FLAG_PATTERN   # None/empty -> default
@@ -115,6 +138,14 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     ports = _merge_port(ports, tgt["port"])
     if tgt["raw"] != host:
         attestation = f"{attestation} | target: {tgt['raw']}"
+
+    # Resolve the engagement mode: what we're looking for + how we prove it.
+    if mode not in MODES:
+        raise EngageError(f"unknown mode '{mode}' (choices: {', '.join(MODES)})")
+    prof = MODES[mode]
+    stop_on_capture = prof["stop"] and not audit      # --audit upgrades a stop-at-first mode to find-all
+    # Honor explicit per-module toggles (dashboard) by intersecting with the mode's family.
+    eff_modules = tuple(m for m in prof["modules"] if (not enabled_modules or m in enabled_modules))
     # The operator's stated objective is recorded in the signed attestation (and
     # the evidence), so a run's intent is auditable. It is context, not an
     # autonomous planner: the pipeline stays deterministic.
@@ -148,7 +179,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     valid_until = (now() + timedelta(hours=2)).isoformat()
 
     emit("engage_started", {"target": target, "host": host, "scheme": tgt["scheme"],
-                            "path": tgt["path"], "ports": ports, "env": env,
+                            "path": tgt["path"], "ports": ports, "env": env, "mode": mode,
                             "operator": operator, "objective": objective}, "engage")
 
     # --- 1) RECON --------------------------------------------------------
@@ -170,9 +201,17 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
 
     result = {"target": target, "run_tag": run_tag, "recon_summary": recon_summary,
               "surfaces": len(surfaces), "web_surfaces": len(web_surfaces), "facts": facts,
-              "recon_out": str(recon_out), "exploit_out": None, "summary": None,
+              "recon_out": str(recon_out), "exploit_out": None, "summary": None, "mode": mode,
               "captured": False, "flag_value": "", "outcome": "no_web_surface",
               "steps": 0, "rate": None}
+
+    # recon mode: stop after mapping the surface — no exploitation.
+    if not prof["exploit"]:
+        emit("engage_finished", {"status": "recon_complete", "mode": mode,
+                                 "surfaces": len(surfaces)}, "engage")
+        result.update(status="recon_complete", outcome="recon",
+                      outcome_detail=prof["desc"])
+        return result
 
     if not web_surfaces:
         emit("engage_finished", {"status": "no_web_surface"}, "engage")
@@ -189,7 +228,7 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
         surfaces=tuple(s.id for s in web_surfaces), flag=flag,
         valid_from=valid_from, valid_until=valid_until, attestation=attestation,
         owner_attested=True, environment=env, allow_production=allow_production,
-        engagement_type="pentest", modules=tuple(enabled_modules),
+        engagement_type="pentest", modules=eff_modules,
         max_steps=max_steps, max_seconds=max_seconds)
 
     exploit_out = root / "runs" / f"{run_tag}-engage-exploit"
@@ -197,14 +236,18 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     summary = ExploitController(xscope, exploit_out, build_registry(), surfaces=web_surfaces,
                                 established_facts=facts, provider=None,
                                 cancel_file=root / "STOP", verbose=verbose,
-                                on_event=phased("exploit"), stop_on_capture=not audit).run()
+                                on_event=phased("exploit"), stop_on_capture=stop_on_capture).run()
 
     captured = summary["flag"]["captured"]
     fv = next((f.get("flag_value") for f in summary.get("findings", []) if f.get("flag_value")), "")
+    vuln_findings = [f for f in summary.get("findings", []) if f.get("type")]  # evidence-based
+    # Status reflects what the mode was after: a flag, or confirmed vulnerabilities, else nothing.
+    status = ("captured" if captured else
+              "vulnerabilities_found" if vuln_findings else "no_breach")
     result.update(summary=summary, exploit_out=str(exploit_out), captured=captured,
                   flag_value=fv, outcome=summary["outcome"], steps=summary["steps"],
-                  rate=summary["flag"]["rate"],
-                  status="captured" if captured else "no_breach")
-    emit("engage_finished", {"status": result["status"], "flag_value": fv,
+                  rate=summary["flag"]["rate"], vulnerabilities=vuln_findings, status=status)
+    emit("engage_finished", {"status": status, "flag_value": fv, "mode": mode,
+                             "vulnerabilities": len(vuln_findings),
                              "outcome": summary["outcome"], "steps": summary["steps"]}, "engage")
     return result

@@ -159,6 +159,11 @@ def respond(path: str, query: str, headers) -> "tuple[int, dict, bytes]":
         low = raw.lower()
         if ("union" in low and "select" in low) or "or 1=1" in low or "or '1'='1" in low or "'--" in low:
             return 200, H, _page("product", f"<h1>Catalog</h1><p>secret row: {FLAG('sqli_union_select')}</p>")
+        if "'" in raw or '"' in raw:   # a stray quote breaks the (simulated) query -> error-based SQLi
+            return 200, H, _page("product",
+                "<h1>Query failed</h1><pre>You have an error in your SQL syntax; check the manual that "
+                "corresponds to your MySQL server version for the right syntax to use near "
+                f"'{html.escape(raw)}' at line 1</pre>")
         try:  # normal lookups use a parameterized query against fabricated rows
             rows = _db().execute("SELECT name,price FROM products WHERE id = ?", (raw,)).fetchall()
             body = "".join(f"<tr><td>{html.escape(str(a))}</td><td>{html.escape(str(b))}</td></tr>"
