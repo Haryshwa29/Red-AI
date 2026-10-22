@@ -6,14 +6,15 @@ where python >nul 2>nul && set "PY=python"
 if not defined PY ( where py >nul 2>nul && set "PY=py" )
 if not defined PY (
   echo Python 3 was not found on this PC.
-  echo Install it from https://python.org  -  be sure to tick "Add python.exe to PATH"  -  then try again.
+  echo Install it from https://python.org  -  tick "Add python.exe to PATH"  -  then try again.
   echo.
   pause
   exit /b 1
 )
-echo Starting RED-AI dashboard at http://127.0.0.1:8787
-echo A server window will open; your browser follows in ~2 seconds. Keep the server window open.
-start "RED-AI Dashboard server (keep this open)" cmd /k "%PY% -u -m red_ai web --no-open --port 8787"
-timeout /t 2 /nobreak >nul
-start "" "http://127.0.0.1:8787"
-exit /b 0
+echo Launching RED-AI dashboard. A browser tab opens automatically.
+echo The URL is printed below - keep this window open; close it to stop.
+echo.
+%PY% -u -m red_ai web --open
+echo.
+echo (server stopped)
+pause

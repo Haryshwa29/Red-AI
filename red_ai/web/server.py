@@ -124,6 +124,22 @@ class _Handler(BaseHTTPRequestHandler):
             _HUB.unregister(conn)
 
 
+def _bind(host: str, port: int, tries: int = 25):
+    """Bind the first free port at or above `port`. Returns (httpd, actual_port).
+
+    A fixed port is fragile on a dev machine already running other servers
+    (e.g. a Svelte/Vite or FastAPI dev server), so we fall forward to the next
+    free port instead of crashing with 'address already in use'.
+    """
+    last: "OSError | None" = None
+    for p in range(port, port + tries):
+        try:
+            return ThreadingHTTPServer((host, p), _Handler), p
+        except OSError as e:  # port busy / not assignable — try the next one
+            last = e
+    raise OSError(f"no free port in {port}..{port + tries - 1}: {last}")
+
+
 def serve(host: str = "127.0.0.1", port: int = 8787, data_dir="data",
           open_browser: bool = False) -> None:
     global _HUB
@@ -135,10 +151,19 @@ def serve(host: str = "127.0.0.1", port: int = 8787, data_dir="data",
     except (AccessDenied, KeyError, FileNotFoundError):
         kr.create(DEFAULT_OPERATOR)
     _HUB = Hub(root)
-    httpd = ThreadingHTTPServer((host, port), _Handler)
+    requested = port
+    httpd, port = _bind(host, port)
     where = "localhost only" if host in ("127.0.0.1", "localhost") else host
     url = f"http://{'127.0.0.1' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}"
-    print(f"RED-AI dashboard on {url}  ({where}) · data: {root}")
+    print("=" * 60)
+    if port != requested:
+        print(f"RED-AI dashboard  (port {requested} was in use -> using {port})")
+    else:
+        print("RED-AI dashboard")
+    print(f"  OPEN THIS IN YOUR BROWSER:  {url}")
+    print(f"  ({where}) · data: {root}")
+    print("  Keep this window open. Close it to stop the server.")
+    print("=" * 60)
     if host not in ("127.0.0.1", "localhost"):
         print("  WARNING: bound to a non-localhost address — this console can drive attacks; "
               "do not expose it on the VPN/LAN.")
