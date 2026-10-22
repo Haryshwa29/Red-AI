@@ -129,9 +129,18 @@ class ReconController:
                 from red_ai.recon.banner import grab_banner, fingerprint, exposure_leads, unauth_exposure
                 raw = grab_banner(r.host, r.port, self.scope.timeout_ms, self.banner_opener)
                 svc_detected, version = fingerprint(raw) if raw else (None, None)
+                leads = exposure_leads(version) + unauth_exposure(svc_detected, version)
+                # SMB/RDP don't volunteer a banner: a read-only negotiate probe tells us
+                # whether SMBv1 is enabled (EternalBlue) or RDP lacks NLA (BlueKeep).
+                from red_ai.recon.smb_rdp import fingerprint_smb_rdp
+                sr = fingerprint_smb_rdp(r.host, r.port, self.scope.timeout_ms)
+                if sr and sr.get("service"):
+                    svc_detected = svc_detected or sr["service"]
+                    finding["smb_rdp"] = {k: v for k, v in sr.items() if k != "leads"}
+                    leads += sr.get("leads", [])
                 finding["service_detected"] = svc_detected
                 finding["version"] = version
-                finding["version_leads"] = exposure_leads(version) + unauth_exposure(svc_detected, version)
+                finding["version_leads"] = leads
             if self.scope.enumerate_web:
                 from red_ai.recon.web import enumerate_web
                 web = enumerate_web(r.host, r.port, opener=self.web_opener,
