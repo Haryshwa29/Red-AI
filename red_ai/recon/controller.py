@@ -126,12 +126,12 @@ class ReconController:
                 "remediation": remediation, "analyst_note": note,
             }
             if self.scope.identify_services:
-                from red_ai.recon.banner import grab_banner, fingerprint, exposure_leads
+                from red_ai.recon.banner import grab_banner, fingerprint, exposure_leads, unauth_exposure
                 raw = grab_banner(r.host, r.port, self.scope.timeout_ms, self.banner_opener)
                 svc_detected, version = fingerprint(raw) if raw else (None, None)
                 finding["service_detected"] = svc_detected
                 finding["version"] = version
-                finding["version_leads"] = exposure_leads(version)
+                finding["version_leads"] = exposure_leads(version) + unauth_exposure(svc_detected, version)
             if self.scope.enumerate_web:
                 from red_ai.recon.web import enumerate_web
                 web = enumerate_web(r.host, r.port, opener=self.web_opener,

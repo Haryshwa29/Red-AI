@@ -59,6 +59,10 @@ def grab_banner(host: str, port: int, timeout_ms: int,
     if port in _HTTP_PORTS:
         send = (f"GET / HTTP/1.0\r\nHost: {host}\r\n"
                 "User-Agent: RED-AI-recon/1.0\r\nAccept: */*\r\nConnection: close\r\n\r\n").encode()
+    elif port == 6379:            # Redis volunteers nothing: ask it to identify itself
+        send = b"INFO server\r\n"
+    elif port == 11211:           # Memcached
+        send = b"version\r\n"
     try:
         raw = opener(host, port, timeout_ms / 1000.0, send)
     except Exception:
@@ -72,6 +76,9 @@ _PATTERNS = [
     (re.compile(r"^SSH-\d+\.\d+-(?P<v>\S+)", re.I), "SSH"),
     (re.compile(r"^220[- ].*?(?P<v>(?:vsftpd|ProFTPD|Pure-FTPd|FileZilla|Microsoft FTP)[\w .\-]*)", re.I), "FTP"),
     (re.compile(r"^220[- ](?P<v>\S+\s+ESMTP\s+\S+)", re.I), "SMTP"),
+    (re.compile(r"^RFB (?P<v>\d{3}\.\d{3})", re.I), "VNC"),
+    (re.compile(r"redis_version:(?P<v>[0-9][\w.\-]*)", re.I), "Redis"),
+    (re.compile(r"^VERSION (?P<v>[0-9][\w.\-]+)", re.I), "Memcached"),
     (re.compile(r"Server:\s*(?P<v>[^\r\n]+)", re.I), "HTTP"),
 ]
 
@@ -81,11 +88,24 @@ def fingerprint(banner: bytes) -> "tuple[Optional[str], Optional[str]]":
     (None, first non-empty line) so the operator still sees the raw greeting."""
     if not banner:
         return None, None
+    # Binary protocols first (no clean text line).
+    if banner[:1] == b"\xff":                       # Telnet: IAC negotiation byte
+        return "Telnet", None
+    # MySQL/MariaDB handshake packet: [3-byte len][seq=0][protover 9|10][version \x00…]
+    if len(banner) > 6 and banner[3] == 0 and banner[4] in (9, 10):
+        ver = banner[5:].split(b"\x00", 1)[0].decode("utf-8", "replace")
+        if re.match(r"^\d+\.\d+", ver):
+            return ("MariaDB" if "mariadb" in ver.lower() else "MySQL"), ver
     text = banner.decode("utf-8", "replace")
     for rx, service in _PATTERNS:
         m = rx.search(text)
         if m:
             return service, m.group("v").strip()
+    # Redis/other servers that answer an error instead of a version string.
+    if text.startswith(("-NOAUTH", "+PONG")) or "-NOAUTH Authentication required" in text:
+        return "Redis", None
+    if text.startswith("-ERR") and "unknown command" in text.lower():
+        return "Redis", None
     first = next((ln.strip() for ln in text.splitlines() if ln.strip()), None)
     return None, first
 
@@ -110,3 +130,18 @@ def exposure_leads(version: Optional[str]) -> list:
         return []
     v = version.lower()
     return [note for sub, note in KNOWN_EXPOSURES if sub in v]
+
+
+def unauth_exposure(service: Optional[str], version: Optional[str]) -> list:
+    """Leads for data stores that answered our probe with no authentication at all.
+
+    Redis/Memcached volunteer nothing on connect, so a usable reply to a benign
+    INFO/version probe means the service is reachable *unauthenticated* — a real
+    exposure, routed as a human-verifiable lead (not auto-escalated)."""
+    if service == "Redis":
+        return ["Redis answered an INFO probe with no authentication — the data store is reachable "
+                "unauthenticated; set `requirepass` and bind to localhost/VPN, do not expose it."]
+    if service == "Memcached":
+        return ["Memcached answered a version probe unauthenticated — exposed cache and a UDP "
+                "amplification vector; bind to localhost, disable UDP, and firewall the port."]
+    return []
