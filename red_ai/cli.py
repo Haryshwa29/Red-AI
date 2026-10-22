@@ -224,6 +224,14 @@ def cmd_engage(root: Path, args) -> int:
               f"[{fw.get('severity','')}] -- {fw.get('evidence','')}")
         for e in fw.get("exposed_sensitive", []):
             print(f"    ⚠ exposed: {e['service']} on port {e['port']}")
+    waf = res.get("waf") or {}
+    if waf:
+        tag = (f"PRESENT ({waf['vendor']})" if waf.get("vendor") else "PRESENT") if waf.get("present") else "none detected"
+        print(f"RED-AI: WAF = {tag} -- {waf.get('evidence','')}")
+    ea = res.get("email_auth") or {}
+    if ea:
+        print(f"RED-AI: email spoofability = {'SPOOFABLE' if ea.get('spoofable') else 'protected'} "
+              f"[{ea.get('severity')}] -- {ea.get('evidence','')[:100]}")
 
     if res["status"] == "recon_complete":
         print(f"RED-AI: recon complete on {args.target} -- "
@@ -317,7 +325,7 @@ def main(argv=None) -> int:
     en.add_argument("--attestation", default="Authorized lab/CTF engagement (operator-attested).",
                     help="authorization statement recorded in the evidence")
     en.add_argument("--allow-production", action="store_true", help="required to engage a production target")
-    en.add_argument("--max-steps", type=int, default=400)
+    en.add_argument("--max-steps", type=int, default=1200)
     en.add_argument("--max-seconds", type=int, default=900)
     en.add_argument("--audit", action="store_true", help="(alias) upgrade a flag mode to find ALL flags")
     en.add_argument("--mode", choices=list(ENGAGE_MODES), default=ENGAGE_DEFAULT_MODE,

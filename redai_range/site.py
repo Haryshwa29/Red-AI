@@ -49,6 +49,8 @@ CHALLENGES = [
      "The viewer takes a path. Try ../../flag or /etc/passwd.", True),
     ("SQL injection", "/product?id=1", "medium",
      "id goes into a query unquoted. Try  1' UNION SELECT flag,'' FROM secret--", True),
+    ("Blind SQL injection", "/profile?uid=1", "hard",
+     "No error or data shown. True vs false conditions differ; or use SLEEP().", True),
     ("Hidden dashboard", "/internal", "easy",
      "Not linked and not in robots — found by checking common paths.", True),
     ("Default credentials", "/admin", "medium",
@@ -171,6 +173,18 @@ def respond(path: str, query: str, headers) -> "tuple[int, dict, bytes]":
             return 200, H, _page("product", f"<h1>Product {html.escape(raw)}</h1><table>{body}</table>")
         except sqlite3.Error as e:
             return 200, H, _page("sql error", f"<h1>DB error</h1><code>{html.escape(str(e))}</code>")
+
+    if path == "/profile":                               # blind SQLi (boolean + time)
+        uid = (q.get("uid") or ["1"])[0]
+        low = uid.lower()
+        import re as _re, time as _t
+        m = _re.search(r"sleep\((\d+)\)|0:0:(\d+)", low)   # time-based: run the injected delay
+        if m:
+            _t.sleep(min(int(m.group(1) or m.group(2) or 0), 4))
+            return 200, H, _page("profile", "<h1>Profile: Alice</h1><p>role: user</p>")
+        if "1=2" in low or "'1'='2" in low:                # false condition -> diverges
+            return 200, H, _page("profile", "<h1>No profile found</h1>")
+        return 200, H, _page("profile", "<h1>Profile: Alice</h1><p>role: user</p>")  # true/baseline
 
     if path == "/admin":                                 # default creds (HTTP Basic)
         if headers.get("Authorization") == _ADMIN_BASIC:

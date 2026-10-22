@@ -21,12 +21,15 @@ from red_ai.control.identity import Keyring, DEFAULT_OPERATOR, AccessDenied
 from red_ai.recon.scope import ReconScope
 from red_ai.recon.controller import ReconController
 from red_ai.recon.firewall import assess_firewall
+from red_ai.recon.email_auth import assess_email_auth
+from red_ai.recon.waf import detect_waf
 from red_ai.exploit.scope import ExploitScope
 from red_ai.exploit.contracts import FlagDefinition
 from red_ai.exploit.module import ExploitModuleRegistry
 from red_ai.exploit.modules import (HTTPFlagReadModule, WebFlagHuntModule, HTTPBasicAuthModule,
                                     LFIModule, SQLiModule, CommandInjectionModule,
-                                    ContentDiscoveryModule, ReflectedXSSDetector, ErrorSQLiDetector)
+                                    ContentDiscoveryModule, ReflectedXSSDetector, ErrorSQLiDetector,
+                                    BooleanBlindSQLiDetector, TimeBlindSQLiDetector)
 from red_ai.exploit.controller import ExploitController
 from red_ai.exploit.bridge import surfaces_from_recon
 
@@ -51,13 +54,16 @@ def build_registry() -> ExploitModuleRegistry:
     reg.register(HTTPFlagReadModule())
     reg.register(ReflectedXSSDetector())
     reg.register(ErrorSQLiDetector())
+    reg.register(BooleanBlindSQLiDetector())
+    reg.register(TimeBlindSQLiDetector())
     return reg
 
 
 # --- engagement modes: what the run is looking for + how it proves it --------
 _FLAG_MODULES = ("native.content_discovery", "native.web_flag_hunt", "native.http_basic_auth",
                  "native.http_flag_read", "native.lfi_read", "native.sqli_read", "native.cmd_injection")
-_EVIDENCE_MODULES = ("native.reflected_xss", "native.sqli_error", "native.http_basic_auth")
+_EVIDENCE_MODULES = ("native.reflected_xss", "native.sqli_error", "native.sqli_boolean",
+                     "native.sqli_time", "native.http_basic_auth")
 
 #   exploit: run the exploit phase at all?   stop: stop at the first flag?   modules: allowlist
 MODES = {
@@ -125,7 +131,7 @@ def _merge_port(ports: str, extra: "int | None") -> str:
 def engage_core(*, root, target, ports="80,8080,8000,8888,443",
                 flag_pattern=DEFAULT_FLAG_PATTERN, env="authorized_lab",
                 attestation="Authorized lab/CTF engagement (operator-attested).",
-                allow_production=False, max_steps=400, max_seconds=900,
+                allow_production=False, max_steps=1200, max_seconds=900,
                 operator=DEFAULT_OPERATOR, enabled_modules=(), objective="",
                 audit=False, mode=DEFAULT_MODE, on_event=None, verbose=False) -> dict:
     """Run one engagement. Returns a result dict (see keys at the bottom)."""
@@ -204,10 +210,31 @@ def engage_core(*, root, target, ports="80,8080,8000,8888,443",
     firewall = assess_firewall(recon_summary)
     emit("firewall_posture", firewall, "enumerate")
 
+    # Email-auth posture (SPF/DKIM/DMARC): hostname targets only, pure DNS reads.
+    email_auth = None
+    if host and "." in host and not host.replace(".", "").isdigit():
+        dom = host[4:] if host.startswith("www.") else host
+        try:
+            email_auth = assess_email_auth(dom)
+            emit("email_auth_posture", email_auth, "enumerate")
+        except Exception:
+            email_auth = None
+
+    # WAF detection on the first web surface (read-only; benign vs malicious-looking probe).
+    waf = None
+    if web_surfaces:
+        s0 = web_surfaces[0]
+        try:
+            waf = detect_waf(f"{s0.scheme or 'http'}://{s0.host}:{s0.port}")
+            emit("waf_detected", waf, "enumerate")
+        except Exception:
+            waf = None
+
     result = {"target": target, "run_tag": run_tag, "recon_summary": recon_summary,
               "surfaces": len(surfaces), "web_surfaces": len(web_surfaces), "facts": facts,
               "recon_out": str(recon_out), "exploit_out": None, "summary": None, "mode": mode,
-              "firewall": firewall, "captured": False, "flag_value": "", "outcome": "no_web_surface",
+              "firewall": firewall, "email_auth": email_auth, "waf": waf,
+              "captured": False, "flag_value": "", "outcome": "no_web_surface",
               "steps": 0, "rate": None}
 
     # recon mode: stop after mapping the surface — no exploitation.
