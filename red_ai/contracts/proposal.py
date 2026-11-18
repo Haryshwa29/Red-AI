@@ -8,7 +8,7 @@ its own proposals and never edits the scope that judges them.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import hashlib
 
 from red_ai.contracts.domain import AttackTechnique

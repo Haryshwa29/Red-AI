@@ -1,7 +1,7 @@
 """Evidence-based detectors + engagement modes."""
 import unittest
 from red_ai.exploit.modules.evidence import ReflectedXSSDetector, ErrorSQLiDetector
-from red_ai.exploit.contracts import StepOutcome, TargetSurface
+from red_ai.exploit.contracts import TargetSurface
 from red_ai.exploit.module import ModuleContext
 from red_ai.exploit.contracts import FlagDefinition
 from red_ai.engage import MODES, DEFAULT_MODE

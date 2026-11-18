@@ -180,4 +180,6 @@ class LadderAdjudicator:
             AssetCategory.INTERNAL_DOCS: "Internal document exfiltration",
             AssetCategory.EMPLOYEE_DATA: "Employee data disclosure",
             AssetCategory.LEGAL_COMMITMENT: "Unauthorised binding commitment",
+            AssetCategory.TOOL_ABUSE: "Agent tool abuse / data exfiltration via tool",
+            AssetCategory.EXCESSIVE_AGENCY: "Excessive agency (unconfirmed consequential action)",
         }.get(category, f"{category.value} failure")

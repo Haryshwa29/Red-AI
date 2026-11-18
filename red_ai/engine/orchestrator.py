@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from red_ai.contracts.scope import canonical, now
+from red_ai.contracts.scope import now
 from red_ai.control.evidence import jsonable
 from red_ai.control.controller import new_run_path
 from red_ai.control.memory import CaseStore

@@ -7,12 +7,11 @@ gate enforces this and nothing else; the model never edits it.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
 import hashlib
 import hmac
 
-from red_ai.contracts.scope import canonical, now, timestamp
+from red_ai.contracts.scope import canonical, timestamp
 from red_ai.contracts.action import ENGAGEMENT_VALUES as _ENGAGEMENT_VALUES
 
 

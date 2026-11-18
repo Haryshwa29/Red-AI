@@ -49,7 +49,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from red_ai.contracts.domain import AttackTechnique, Objective, TargetProfile, Turn
+from red_ai.contracts.domain import AttackTechnique, Objective, Turn
 from red_ai.contracts.interfaces import ModelProvider
 from red_ai.contracts.domain import Message
 from red_ai.intelligent.planner import AdaptivePlanner

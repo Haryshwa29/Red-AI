@@ -31,7 +31,7 @@ import http.server
 import socketserver
 import sqlite3
 import sys
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs
 
 FLAG = "FLAG{{{}}}".format  # FLAG("x") -> "FLAG{x}" (matches RED-AI's flag detector)
 

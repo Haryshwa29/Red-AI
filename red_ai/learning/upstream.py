@@ -32,12 +32,11 @@ Design rationale
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 import json
 
 from red_ai.contracts.domain import AssetCategory, AttackTechnique
-from red_ai.contracts.scope import canonical, now
+from red_ai.contracts.scope import now
 from red_ai.contracts.upgrade import (
     GenericCapability, LocalProvenance, UpgradeCandidate, assert_clean,
 )

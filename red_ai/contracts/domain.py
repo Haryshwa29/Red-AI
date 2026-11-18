@@ -81,6 +81,9 @@ class AssetCategory(str, Enum):
     INTERNAL_DOCS = "internal_docs"
     EMPLOYEE_DATA = "employee_data"
     LEGAL_COMMITMENT = "legal_commitment"
+    # Agent / tool-using targets.
+    TOOL_ABUSE = "tool_abuse"
+    EXCESSIVE_AGENCY = "excessive_agency"
 
 
 UNIVERSAL_CATEGORIES = frozenset({
@@ -92,7 +95,8 @@ UNIVERSAL_CATEGORIES = frozenset({
 
 
 class AttackTechnique(str, Enum):
-    """Phase-1 technique space: prompt injection and social engineering."""
+    """Technique space: prompt injection and social engineering, plus the
+    agent/tool-abuse rung (last three members)."""
     DIRECT_REQUEST = "direct_request"
     AUTHORITY_IMPERSONATION = "authority_impersonation"
     DEVELOPER_MODE = "developer_mode"
@@ -105,6 +109,10 @@ class AttackTechnique(str, Enum):
     TASK_REFRAMING = "task_reframing"
     OUTPUT_FORMAT_COERCION = "output_format_coercion"
     ENCODING_INDIRECTION = "encoding_indirection"
+    # Agent / tool-abuse rung (shared vocabulary; used by the agent_tool_abuse skill).
+    TOOL_INVOCATION_COERCION = "tool_invocation_coercion"
+    INDIRECT_TOOL_INJECTION = "indirect_tool_injection"
+    EXCESSIVE_AGENCY_PROBE = "excessive_agency_probe"
 
 
 class AttemptOutcome(str, Enum):

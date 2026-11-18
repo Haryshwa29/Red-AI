@@ -25,7 +25,7 @@ from red_ai.detection.canary import make_canary
 from red_ai.onboarding.profile import build_profile
 from red_ai.onboarding.objectives import ProfileObjectiveGenerator
 from red_ai.intelligent import skills
-from red_ai.intelligent.providers import MockProvider, make_provider, ProviderError
+from red_ai.intelligent.providers import MockProvider, make_provider
 from red_ai.targets.simulation import SimulationAdapter, _LEVELS
 from red_ai.engage import MODES as ENGAGE_MODES, DEFAULT_MODE as ENGAGE_DEFAULT_MODE
 from red_ai.control.controller import Controller, new_run_path

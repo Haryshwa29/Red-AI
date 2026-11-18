@@ -8,7 +8,7 @@ from pathlib import Path
 
 from red_ai.contracts.scope import now
 from red_ai.exploit import (ExploitScope, FlagDefinition, TargetSurface,
-                            ExploitModuleRegistry, AttemptOutcome)
+                            ExploitModuleRegistry)
 from red_ai.exploit.contracts import ExploitStep, ExploitTechnique, StepOutcome
 from red_ai.exploit.module import ModuleContext
 from red_ai.exploit.controller import ExploitController

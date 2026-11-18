@@ -6,9 +6,8 @@ from datetime import timedelta
 from pathlib import Path
 
 from red_ai.contracts.domain import (
-    AssetCategory, AttackTechnique, Attempt, AttemptOutcome, DetectorTier, Finding,
-    Objective, ReviewState, SensitiveAsset, Severity, Signal, TargetProfile,
-    TargetResponse, Turn, ScanResult,
+    AssetCategory, AttackTechnique, Attempt, AttemptOutcome, DetectorTier, Objective, ReviewState, SensitiveAsset, Severity, Signal, TargetProfile,
+    TargetResponse, Turn,
 )
 from red_ai.contracts.scope import Scope, now, sign_scope, verify_scope
 from red_ai.contracts.proposal import Proposal

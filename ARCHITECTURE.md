@@ -49,10 +49,13 @@ gate before execution. The LLM never controls its own guardrails.
 | `control/memory` | control | Reviewed-finding corpus (operator-attested, reproducible); priors only |
 | `intelligent/planner` | intelligent | Adaptive explore/exploit over the technique space |
 | `intelligent/providers` | intelligent | ModelProvider seam + offline MockProvider |
-| `intelligent/skills` | intelligent | Skill registry; prompt-injection is skill #1 (the growth seam) |
+| `intelligent/skills` | intelligent | Skill registry; prompt-injection is skill #1, agent/tool-abuse is skill #2 (the growth seam) |
 | `detection/{canary,policy,ladder}` | detection | 3-tier detector ladder; deterministic-first |
 | `detection/adjudicator` | detection | Signals -> findings; severity derived from stated inputs |
 | `targets/simulation` | boundary | TargetAdapter over graduated mocks (naive/guarded/hardened) |
+| `targets/http_target` | boundary | TargetAdapter over a live HTTP chat endpoint (ollama/openai) |
+| `targets/tool_agent` | boundary | TargetAdapter over a tool-using agent; tool-call trace in `response.raw` (rung 2) |
+| `detection/tool_abuse` | detection | tier-1 tool-exfiltration canary + tier-2 unauthorized/unconfirmed tool call |
 | `onboarding/{taxonomy,profile,objectives}` | intelligent | Asset inference + objective generation |
 | `reporting/report` | output | Offline JSON/MD/HTML from the verified journal |
 | `engine/knowledge` | engine | Knowledge System: trusted facts vs quarantined target text; priors; pinned snapshot |
@@ -204,7 +207,10 @@ Each rung is a new **Skill** registered behind the same gate/evidence/reporting
 spine — the engine does not grow new powers, the plugin set does:
 
 1. Prompt injection & social engineering  *(implemented)*
-2. Indirect / retrieved-content injection + tool abuse (needs instrumented target telemetry)
+2. Indirect / retrieved-content injection + tool abuse *(implemented: `targets/tool_agent`
+   supplies the instrumented tool-call telemetry, `detection/tool_abuse` proves it, and skill
+   `agent_tool_abuse` reuses the adaptive planner UNCHANGED — the TargetAdapter seam in action;
+   see docs/adr/0001-target-adapter-seam.md)*
 3. Multi-turn / agent manipulation (needs session-state adapters)
 4. Model-driven **strategy** behind the ModelProvider seam *(implemented: a
    local Ollama/OpenAI-compatible provider + a model-driven planner that

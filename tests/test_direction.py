@@ -15,7 +15,7 @@ import unittest
 from datetime import timedelta
 
 from red_ai.contracts.action import (
-    ActionTier, Authority, EngagementType, tier_authority,
+    ActionTier, Authority, tier_authority,
     ACTION_TIER_VALUES, ENGAGEMENT_VALUES,
 )
 from red_ai.contracts.domain import AssetCategory, Severity

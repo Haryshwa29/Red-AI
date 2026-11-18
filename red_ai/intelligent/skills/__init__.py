@@ -3,6 +3,7 @@ model can only use what is registered here."""
 from __future__ import annotations
 
 from red_ai.intelligent.skills.prompt_injection import PromptInjectionSkill
+from red_ai.intelligent.skills.agent_tool_abuse import AgentToolAbuseSkill
 
 _REGISTRY: dict[str, object] = {}
 
@@ -24,3 +25,4 @@ def all_skills() -> list:
 
 
 register(PromptInjectionSkill())
+register(AgentToolAbuseSkill())

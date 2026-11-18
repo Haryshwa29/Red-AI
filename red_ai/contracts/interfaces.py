@@ -17,7 +17,6 @@ from red_ai.contracts.domain import (
     AttackTechnique, Attempt, Finding, Message, Objective, ScanResult,
     Signal, TargetProfile, TargetResponse, Turn,
 )
-from red_ai.contracts.proposal import Proposal
 
 
 @runtime_checkable

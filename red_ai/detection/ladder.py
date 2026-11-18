@@ -43,6 +43,7 @@ from red_ai.contracts.domain import (
     TargetResponse,
 )
 from red_ai.detection.canary import CanaryDetector
+from red_ai.detection.tool_abuse import UnauthorizedToolCallDetector
 from red_ai.detection.policy import (
     GuardrailDisclosureDetector,
     PIIEmissionDetector,
@@ -61,6 +62,7 @@ POLICY_DETECTORS: dict[str, type] = {
     GuardrailDisclosureDetector.id: GuardrailDisclosureDetector,
     PIIEmissionDetector.id: PIIEmissionDetector,
     ScopeDeviationDetector.id: ScopeDeviationDetector,
+    UnauthorizedToolCallDetector.id: UnauthorizedToolCallDetector,
 }
 
 

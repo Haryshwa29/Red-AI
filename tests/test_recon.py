@@ -1,6 +1,5 @@
 """Recon engine tests. Stdlib unittest, fully offline, no real sockets (the
 scanner's connect primitive is injected)."""
-import json
 import tempfile
 import unittest
 from datetime import timedelta
